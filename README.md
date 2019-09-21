@@ -81,6 +81,7 @@ cleos push action proxy claim '["myaccount"]' -p myaccount
 {
   "owner": "myaccount",
   "proxy": "proxy4nation",
+  "producers": [],
   "staked": 6000,
   "last_vote_weight": "5361455468.19293689727783203",
   "is_proxy": 0,
