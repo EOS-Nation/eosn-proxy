@@ -24,11 +24,12 @@ Signup owner to EOS Nation Proxy Staking Service
 ### params
 
 - `{name} owner` - owner account
+- `{name} [referral=""]` - (optional) referral account
 
 ### example
 
 ```bash
-cleos push action proxy4nation signup '["myaccount"]' -p myaccount
+cleos push action proxy4nation signup '["myaccount", "tokenyield"]' -p myaccount
 ```
 
 ## ACTION `claim`
