@@ -1,19 +1,23 @@
-# EOSN Proxy Staking Service
+# EOS Nation - Proxy Staking Service
 
 ## ACTION
 
-- [`signup`](#action-signup)
 - [`claim`](#action-claim)
+- [`signup`](#action-signup)
+- [`refresh`](#action-refresh)
+- [`setrate`](#action-setrate)
+- [`setinterval`](#action-setinterval)
+- [`setreward`](#action-setreward)
 
 ## TABLE
 
 - [`rewards`](#rewards-table)
-- [`voters`](#voters-table)
 - [`settings`](#settings-table)
+- [`voters`](#voters-table)
 
 ## ACTION `signup`
 
-Signup owner to proxy pool
+Signup owner to EOS Nation Proxy Staking Service
 
 - Authority: `owner`
 
@@ -24,12 +28,12 @@ Signup owner to proxy pool
 ### example
 
 ```bash
-cleos push action proxy signup '["myaccount"]' -p myaccount
+cleos push action proxy4nation signup '["myaccount"]' -p myaccount
 ```
 
 ## ACTION `claim`
 
-Perform claim action for owner to claim proxy pool rewards
+Claim rewards from EOS Nation Proxy Staking Service
 
 - Authority: `owner`
 
@@ -40,7 +44,72 @@ Perform claim action for owner to claim proxy pool rewards
 ### example
 
 ```bash
-cleos push action proxy claim '["myaccount"]' -p myaccount
+cleos push action proxy4nation claim '["myaccount"]' -p myaccount
+```
+
+## ACTION `refresh`
+
+Refresh voter information
+
+- Authority: `get_self()`
+
+### params
+
+- `{name} voter` - voter account
+
+### example
+
+```bash
+cleos push action proxy4nation refresh '["myaccount"]' -p proxy4nation
+```
+
+## ACTION `setrate`
+
+Set APR rate
+
+- Authority: `get_self()`
+
+### params
+
+- `{int64_t} [rate=400]` - APR rate (pips 1/100 of 1%)
+
+### example
+
+```bash
+cleos push action proxy4nation setrate '[400]' -p proxy4nation
+```
+
+## ACTION `setinterval`
+
+Set claim interval in seconds
+
+- Authority: `get_self()`
+
+### params
+
+- `{int64_t} [interval=86400]` - claim interval in seconds
+
+### example
+
+```bash
+cleos push action proxy4nation setinterval '[86400]' -p proxy4nation
+```
+
+## ACTION `setreward`
+
+Set authorized reward asset
+
+- Authority: `get_self()`
+
+### params
+
+- `{extended_symbol} reward` - token reward symbol
+- `{int64_t} multiplier` - token reward multiplier
+
+### example
+
+```bash
+cleos push action proxy4nation setreward '[{"contract":"eosio.token", "symbol": "4,EOS"}, 1]' -p proxy4nation
 ```
 
 ## TABLE `rewards`
@@ -91,14 +160,14 @@ cleos push action proxy claim '["myaccount"]' -p myaccount
 
 ## TABLE `settings`
 
-- `{int64_t} [rate=400]` - APR rate pips 1/100 of 1%
+- `{int64_t} [rate=250]` - APR rate pips 1/100 of 1%
 - `{int64_t} [interval=86400]` - claim interval in seconds
 
 ### example
 
 ```json
 {
-  "rate": 400,
+  "rate": 250,
   "interval": 86400
 }
 ```
