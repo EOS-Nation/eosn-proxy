@@ -8,6 +8,7 @@
 - [`setrate`](#action-setrate)
 - [`setinterval`](#action-setinterval)
 - [`setreward`](#action-setreward)
+- [`setreferral`](#action-setreferral)
 
 ## TABLE
 
