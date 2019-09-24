@@ -14,6 +14,7 @@
 - [`rewards`](#rewards-table)
 - [`settings`](#settings-table)
 - [`voters`](#voters-table)
+- [`referrals`](#referrals-table)
 
 ## ACTION `signup`
 
@@ -113,6 +114,23 @@ Set authorized reward asset
 cleos push action proxy4nation setreward '[{"contract":"eosio.token", "symbol": "4,EOS"}, 1]' -p proxy4nation
 ```
 
+## ACTION `setreferral`
+
+Set authorized referral
+
+- Authority: `get_self()`
+
+### params
+
+- `{name} name` - referral account
+- `{string} metadata` - referral metadata
+
+### example
+
+```bash
+cleos push action proxy4nation setreferral '["tokenyield", "TokenYield.io - Track and Manage Blockchain Rewards"]' -p proxy4nation
+```
+
 ## TABLE `rewards`
 
 - `{asset} rewards` - culmative rewards of all claims
@@ -144,6 +162,7 @@ cleos push action proxy4nation setreward '[{"contract":"eosio.token", "symbol": 
 - `{double} last_vote_weight` - last vote weight
 - `{boolean} is_proxy` - true/false is proxy
 - `{time_point_sec} next_claim_period` - next available claim period
+- `{name} referral` - referral account
 
 ### example
 
@@ -155,7 +174,22 @@ cleos push action proxy4nation setreward '[{"contract":"eosio.token", "symbol": 
   "staked": 6000,
   "last_vote_weight": "5361455468.19293689727783203",
   "is_proxy": 0,
-  "next_claim_period": "2019-08-07T18:37:37"
+  "next_claim_period": "2019-08-07T18:37:37",
+  "referral": "tokenyield"
+}
+```
+
+## TABLE `referrals`
+
+- `{name} name` - referral account
+- `{string} metadata` - referral metadata
+
+### example
+
+```json
+{
+  "name": "tokenyield",
+  "metadata": "TokenYield.io - Track and Manage Blockchain Rewards"
 }
 ```
 
