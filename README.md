@@ -16,6 +16,7 @@
 - [`settings`](#settings-table)
 - [`voters`](#voters-table)
 - [`referrals`](#referrals-table)
+- [`last`](#last-table)
 
 ## ACTION `signup`
 
@@ -134,23 +135,17 @@ cleos push action proxy4nation setreferral '["tokenyield", "TokenYield.io - Trac
 
 ## TABLE `rewards`
 
-- `{asset} rewards` - culmative rewards of all claims
+- `{symbol} symbol` - reward token symbol
 - `{name} contract` - reward token contract
 - `{int64_t} multiplier` - reward multiplier
-- `{asset} last_reward` - last claimed reward amount
-- `{name} last_user` - last user to claim rewards
-- `{time_point_sec} last_claim` - timestamp of last claim
 
 ### example
 
 ```json
 {
-  "rewards": "20.0000 EOS",
+  "symbol": "4,EOS",
   "contract": "eosio.token",
-  "multiplier": 1,
-  "last_reward": "1.5000 EOS",
-  "last_user": "myaccount",
-  "last_claim": "2019-09-23T00:00:00"
+  "multiplier": 1
 }
 ```
 
@@ -180,6 +175,28 @@ cleos push action proxy4nation setreferral '["tokenyield", "TokenYield.io - Trac
 }
 ```
 
+## TABLE `last`
+
+- `{name} voter` - last voter to claim rewards
+- `{asset} amount` - last claimed reward amount
+- `{int64_t} rate` - APR rate pips 1/100 of 1%
+- `{int64_t} interval` - claim interval in seconds
+- `{time_point_sec} timestamp` - timestamp of last claim
+- `{checksum256} trx_id` - transaction id
+
+### example
+
+```json
+{
+  "voter": "myaccount",
+  "amount": "1.5000 EOS",
+  "rate": 350,
+  "interval": 86400,
+  "timestamp": "2019-09-23T00:00:00",
+  "trx_id": "0e90ad6152b9ba35500703bc9db858f6e1a550b5e1a8de05572f81cdcaae3a08"
+}
+```
+
 ## TABLE `referrals`
 
 - `{name} name` - referral account
@@ -196,14 +213,14 @@ cleos push action proxy4nation setreferral '["tokenyield", "TokenYield.io - Trac
 
 ## TABLE `settings`
 
-- `{int64_t} [rate=250]` - APR rate pips 1/100 of 1%
+- `{int64_t} [rate=350]` - APR rate pips 1/100 of 1%
 - `{int64_t} [interval=86400]` - claim interval in seconds
 
 ### example
 
 ```json
 {
-  "rate": 250,
+  "rate": 350,
   "interval": 86400
 }
 ```
