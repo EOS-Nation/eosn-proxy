@@ -199,6 +199,26 @@ public:
     void setreferral( const eosio::name name, const string metadata );
 
     /**
+     * ## ACTION `setrex`
+     *
+     * Set REX APR rate
+     *
+     * - Authority: `get_self()`
+     *
+     * ### params
+     *
+     * - `{int64_t} [rate=16]` - REX APR rate (pips 1/100 of 1%)
+     *
+     * ### example
+     *
+     * ```bash
+     * cleos push action proxy4nation setrex '[16]' -p proxy4nation
+     * ```
+     */
+    [[eosio::action]]
+    void setrex( const int64_t rate = 16 );
+
+    /**
      * ## ON_NOTIFY `transfer`
      *
      * On token transfer notification, update proxy APR
@@ -329,19 +349,22 @@ private:
      *
      * - `{int64_t} [rate=400]` - APR rate pips 1/100 of 1%
      * - `{int64_t} [interval=86400]` - claim interval in seconds
+     * - `{int64_t} [rex=16]` - REX APR rate pips 1/100 of 1%
      *
      * ### example
      *
      * ```json
      * {
      *   "rate": 400,
-     *   "interval": 86400
+     *   "interval": 86400,
+     *   "rex": 16
      * }
      * ```
      */
     struct [[eosio::table("settings")]] settings_row {
         int64_t rate = 400;
         int64_t interval = 86400;
+        int64_t rex = 16;
     };
 
     /**
@@ -398,4 +421,7 @@ private:
     void send_rewards( const eosio::name owner, const int64_t staked, const eosio::symbol sym );
     void check_proxy( const eosio::name proxy );
     int64_t calculate_amount( const int64_t staked, const int64_t multiplier, const int64_t rate, const int64_t interval );
+    void require_auth_or_self( eosio::name owner );
+    void require_auth_or_self_or_referral( eosio::name owner );
+    void send_referral( const eosio::name owner, const eosio::asset quantity, const eosio::name contract );
 };
