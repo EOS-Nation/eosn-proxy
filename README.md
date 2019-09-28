@@ -9,14 +9,15 @@
 - [`setinterval`](#action-setinterval)
 - [`setreward`](#action-setreward)
 - [`setreferral`](#action-setreferral)
+- [`setrex`](#action-setrex)
 
 ## TABLE
 
-- [`rewards`](#rewards-table)
-- [`settings`](#settings-table)
-- [`voters`](#voters-table)
-- [`referrals`](#referrals-table)
-- [`last`](#last-table)
+- [`rewards`](#table-rewards)
+- [`settings`](#table-settings)
+- [`voters`](#table-voters)
+- [`referrals`](#table-referrals)
+- [`last`](#table-last)
 
 ## ACTION `signup`
 
@@ -32,7 +33,7 @@ Signup owner to EOS Nation Proxy Staking Service
 ### example
 
 ```bash
-cleos push action proxy4nation signup '["myaccount", "tokenyield"]' -p myaccount
+cleos push action proxy4nation signup '["myaccount", "tokenyieldio"]' -p myaccount
 ```
 
 ## ACTION `claim`
@@ -83,6 +84,22 @@ Set APR rate
 cleos push action proxy4nation setrate '[400]' -p proxy4nation
 ```
 
+## ACTION `setrex`
+
+Set REX APR rate
+
+- Authority: `get_self()`
+
+### params
+
+- `{int64_t} [rate=16]` - REX APR rate (pips 1/100 of 1%)
+
+### example
+
+```bash
+cleos push action proxy4nation setrex '[16]' -p proxy4nation
+```
+
 ## ACTION `setinterval`
 
 Set claim interval in seconds
@@ -130,7 +147,7 @@ Set authorized referral
 ### example
 
 ```bash
-cleos push action proxy4nation setreferral '["tokenyield", "TokenYield.io - Track and Manage Blockchain Rewards"]' -p proxy4nation
+cleos push action proxy4nation setreferral '["tokenyieldio", "TokenYield.io - Track and Manage Blockchain Rewards"]' -p proxy4nation
 ```
 
 ## TABLE `rewards`
@@ -171,7 +188,7 @@ cleos push action proxy4nation setreferral '["tokenyield", "TokenYield.io - Trac
   "last_vote_weight": "5361455468.19293689727783203",
   "is_proxy": 0,
   "next_claim_period": "2019-08-07T18:37:37",
-  "referral": "tokenyield"
+  "referral": "tokenyieldio"
 }
 ```
 
@@ -206,7 +223,7 @@ cleos push action proxy4nation setreferral '["tokenyield", "TokenYield.io - Trac
 
 ```json
 {
-  "name": "tokenyield",
+  "name": "tokenyieldio",
   "metadata": "TokenYield.io - Track and Manage Blockchain Rewards"
 }
 ```
@@ -215,12 +232,14 @@ cleos push action proxy4nation setreferral '["tokenyield", "TokenYield.io - Trac
 
 - `{int64_t} [rate=350]` - APR rate pips 1/100 of 1%
 - `{int64_t} [interval=86400]` - claim interval in seconds
+- `{int64_t} [rex=16]` - REX APR rate pips 1/100 of 1%
 
 ### example
 
 ```json
 {
   "rate": 350,
-  "interval": 86400
+  "interval": 86400,
+  "rex": 16
 }
 ```
