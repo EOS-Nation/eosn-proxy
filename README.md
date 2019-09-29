@@ -4,12 +4,15 @@
 
 - [`claim`](#action-claim)
 - [`signup`](#action-signup)
+- [`unsignup`](#action-unsignup)
 - [`refresh`](#action-refresh)
 - [`setrate`](#action-setrate)
 - [`setinterval`](#action-setinterval)
 - [`setreward`](#action-setreward)
 - [`setreferral`](#action-setreferral)
+- [`delreferral`](#action-delreferral)
 - [`setrex`](#action-setrex)
+- [`clean`](#action-clean)
 
 ## TABLE
 
@@ -19,11 +22,27 @@
 - [`referrals`](#table-referrals)
 - [`last`](#table-last)
 
+## APR Formula
+
+```c++
+// amount = Staked * APR / 4 precision / 365 days * multiplier / (24 hours / interval)
+int64_t amount = staked * rate / 10000 / 365 * multiplier / ( 86400 / interval );
+```
+
+**Example**
+
+User has 10K EOS staked and claims his 24 hour reward will earn `1.0547 EOS`
+
+```js
+Staked * APR / 365 days = reward
+10000.0000 * 0.0385 / 365 = 1.0547
+```
+
 ## ACTION `signup`
 
 Signup owner to EOS Nation Proxy Staking Service
 
-- Authority: `owner`
+- Authority: `owner` or `get_self()`
 
 ### params
 
@@ -50,6 +69,22 @@ Claim rewards from EOS Nation Proxy Staking Service
 
 ```bash
 cleos push action proxy4nation claim '["myaccount"]' -p myaccount
+```
+
+## ACTION `unsignup`
+
+Remove owner from EOS Nation Proxy Staking Service
+
+- Authority: `owner`
+
+### params
+
+- `{name} owner` - owner account
+
+### example
+
+```bash
+cleos push action proxy4nation unsignup '["myaccount"]' -p myaccount
 ```
 
 ## ACTION `refresh`
@@ -137,17 +172,51 @@ cleos push action proxy4nation setreward '[{"contract":"eosio.token", "symbol": 
 
 Set authorized referral
 
-- Authority: `get_self()`
+- Authority: `get_self()` or `referral`
 
 ### params
 
-- `{name} name` - referral account
-- `{string} metadata` - referral metadata
+- `{name} name` - referral account name
+- `{string} website` - referral website
+- `{string} description` - referral description
+- `{int64_t} [rate=50000]` - referral rate pips 1/100 of 1% (maximum of 5%)
 
 ### example
 
 ```bash
-cleos push action proxy4nation setreferral '["tokenyieldio", "TokenYield.io - Track and Manage Blockchain Rewards"]' -p proxy4nation
+cleos push action proxy4nation setreferral '["tokenyieldio", "https://tokenyield.io", "Track and Manage Blockchain Rewards", 50000]' -p proxy4nation
+```
+
+## ACTION `delreferral`
+
+Delete referral
+
+- Authority: `get_self()` or `referral`
+
+### params
+
+- `{name} referral` - referral account name
+
+### example
+
+```bash
+cleos push action proxy4nation delreferral '["tokenyieldio"]' -p proxy4nation
+```
+
+## ACTION `clean`
+
+Cleans contract tables
+
+- Authority: `get_self()`
+
+### params
+
+- `{name} table` - table to clean
+
+### example
+
+```bash
+cleos push action proxy4nation clean '["referrals"]' -p proxy4nation
 ```
 
 ## TABLE `rewards`
@@ -217,14 +286,18 @@ cleos push action proxy4nation setreferral '["tokenyieldio", "TokenYield.io - Tr
 ## TABLE `referrals`
 
 - `{name} name` - referral account
-- `{string} metadata` - referral metadata
+- `{string} website` - referral website
+- `{string} description` - referral description
+- `{int64_t} [rate=50000]` - referral rate pips 1/100 of 1% (maximum of 5%)
 
 ### example
 
 ```json
 {
   "name": "tokenyieldio",
-  "metadata": "TokenYield.io - Track and Manage Blockchain Rewards"
+  "website": "https://tokenyield.io",
+  "description": "Track and Manage Blockchain Rewards",
+  "rate": 50000
 }
 ```
 
