@@ -40,7 +40,7 @@ public:
      *
      * Signup owner to EOS Nation Proxy Staking Service
      *
-     * - Authority: `owner`
+     * - Authority: `owner` or `get_self()`
      *
      * ### params
      *
@@ -77,6 +77,26 @@ public:
     void claim( const eosio::name owner );
 
     /**
+     * ## ACTION `unsignup`
+     *
+     * Remove owner from EOS Nation Proxy Staking Service
+     *
+     * - Authority: `owner`
+     *
+     * ### params
+     *
+     * - `{name} owner` - owner account
+     *
+     * ### example
+     *
+     * ```bash
+     * cleos push action proxy4nation unsignup '["myaccount"]' -p myaccount
+     * ```
+     */
+    [[eosio::action]]
+    void unsignup( const eosio::name owner );
+
+    /**
      * ## ACTION `refresh`
      *
      * Refresh voter information
@@ -105,16 +125,16 @@ public:
      *
      * ### params
      *
-     * - `{bool} all` - true/false to include all tables
+     * - `{name} table` - table to clean
      *
      * ### example
      *
      * ```bash
-     * cleos push action proxy4nation clean '[true]' -p proxy4nation
+     * cleos push action proxy4nation clean '["voters"]' -p proxy4nation
      * ```
      */
     [[eosio::action]]
-    void clean( const bool all );
+    void clean( const eosio::name table );
 
     /**
      * ## ACTION `setrate`
@@ -182,21 +202,44 @@ public:
      *
      * Set authorized referral
      *
-     * - Authority: `get_self()`
+     * - Authority: `get_self()` or `referral`
      *
      * ### params
      *
-     * - `{name} name` - referral account
-     * - `{string} metadata` - referral metadata
+     * - `{name} name` - referral account name
+     * - `{string} website` - referral website
+     * - `{string} description` - referral description
+     * - `{int64_t} [rate=50000]` - referral rate pips 1/100 of 1% (maximum of 5%)
      *
      * ### example
      *
      * ```bash
-     * cleos push action proxy4nation setreferral '["tokenyield", "TokenYield.io - Track and Manage Blockchain Rewards"]' -p proxy4nation
+     * cleos push action proxy4nation setreferral '["tokenyieldio", "Track and Manage Blockchain Rewards", "https://tokenyield.io", 50000]' -p proxy4nation
      * ```
      */
     [[eosio::action]]
-    void setreferral( const eosio::name name, const string metadata );
+    void setreferral( const eosio::name name, const string website, const string description, const int64_t rate );
+
+
+    /**
+     * ## ACTION `delreferral`
+     *
+     * Delete referral
+     *
+     * - Authority: `get_self()` or `referral`
+     *
+     * ### params
+     *
+     * - `{name} referral` - referral account name
+     *
+     * ### example
+     *
+     * ```bash
+     * cleos push action proxy4nation delreferral '["tokenyieldio"]' -p proxy4nation
+     * ```
+     */
+    [[eosio::action]]
+    void delreferral( const eosio::name referral );
 
     /**
      * ## ACTION `setrex`
@@ -254,6 +297,7 @@ public:
     using refresh_action = eosio::action_wrapper<"refresh"_n, &proxy::refresh>;
     using setrate_action = eosio::action_wrapper<"setrate"_n, &proxy::setrate>;
     using setreferral_action = eosio::action_wrapper<"setreferral"_n, &proxy::setreferral>;
+    using delreferral_action = eosio::action_wrapper<"delreferral"_n, &proxy::delreferral>;
     using setinterval_action = eosio::action_wrapper<"setinterval"_n, &proxy::setinterval>;
 
 private:
@@ -326,20 +370,26 @@ private:
      * ## TABLE `referrals`
      *
      * - `{name} name` - referral account
-     * - `{string} metadata` - referral metadata
+     * - `{string} website` - referral website
+     * - `{string} description` - referral description
+     * - `{int64_t} [rate=50000]` - referral rate pips 1/100 of 1% (maximum of 5%)
      *
      * ### example
      *
      * ```json
      * {
-     *   "name": "tokenyield",
-     *   "metadata": "TokenYield.io - Track and Manage Blockchain Rewards"
+     *   "name": "tokenyieldio",
+     *   "website": "https://tokenyield.io",
+     *   "description": "Track and Manage Blockchain Rewards",
+     *   "rate": 50000
      * }
      * ```
      */
     struct [[eosio::table("referrals")]] referrals_row {
         eosio::name     name;
-        string          metadata;
+        string          website;
+        string          description;
+        int64_t         rate;
 
         uint64_t primary_key() const { return name.value; }
     };
