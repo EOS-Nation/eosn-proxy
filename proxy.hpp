@@ -31,7 +31,7 @@ public:
             _settings( get_self(), get_self().value ),
             _rewards( get_self(), get_self().value ),
             _referrals( get_self(), get_self().value ),
-            _last( get_self(), get_self().value ),
+            _proxies( get_self(), get_self().value ),
             _eosio_voters( "eosio"_n, "eosio"_n.value )
     {}
 
@@ -262,6 +262,27 @@ public:
     void setrex( const int64_t rate = 16 );
 
     /**
+     * ## ACTION `setproxy`
+     *
+     * Set authorized proxy
+     *
+     * - Authority: `get_self()`
+     *
+     * ### params
+     *
+     * - `{name} proxy` - proxy account name
+     * - `{bool} active` - true/false if proxy is active
+     *
+     * ### example
+     *
+     * ```bash
+     * cleos push action proxy4nation setproxy '["proxy4nation", true]' -p proxy4nation
+     * ```
+     */
+    [[eosio::action]]
+    void setproxy( const eosio::name proxy, const bool active );
+
+    /**
      * ## ON_NOTIFY `transfer`
      *
      * On token transfer notification, update proxy APR
@@ -367,6 +388,34 @@ private:
     };
 
     /**
+     * ## TABLE `proxies`
+     *
+     * - `{name} proxy` - voting proxy
+     * - `{vector<name>}` producers - the producers approved by this proxy
+     * - `{double} last_vote_weight` - last vote weight
+     * - `{bool} active` - true/false if proxy is active
+     *
+     * ### example
+     *
+     * ```json
+     * {
+     *   "proxy": "proxy4nation",
+     *   "active": true,
+     *   "producers": ["eosnationftw"],
+     *   "last_vote_weight": "5361455468.19293689727783203"
+     * }
+     * ```
+     */
+    struct [[eosio::table("proxies")]] proxies_row {
+        eosio::name         proxy;
+        bool                active = true;
+        vector<eosio::name> producers;
+        double              last_vote_weight = 0;
+
+        uint64_t primary_key() const { return proxy.value; }
+    };
+
+    /**
      * ## TABLE `referrals`
      *
      * - `{name} name` - referral account
@@ -417,61 +466,29 @@ private:
         int64_t rex = 16;
     };
 
-    /**
-     * ## TABLE `last`
-     *
-     * - `{name} voter` - last voter to claim rewards
-     * - `{asset} amount` - last claimed reward amount
-     * - `{int64_t} rate` - APR rate pips 1/100 of 1%
-     * - `{int64_t} interval` - claim interval in seconds
-     * - `{time_point_sec} timestamp` - timestamp of last claim
-     * - `{checksum256} trx_id` - transaction id
-     *
-     * ### example
-     *
-     * ```json
-     * {
-     *   "voter": "myaccount",
-     *   "amount": "1.5000 EOS",
-     *   "rate": 350,
-     *   "interval": 86400,
-     *   "timestamp": "2019-09-23T00:00:00",
-     *   "trx_id": "0e90ad6152b9ba35500703bc9db858f6e1a550b5e1a8de05572f81cdcaae3a08"
-     * }
-     * ```
-     */
-    struct [[eosio::table("last")]] last_row {
-        eosio::name voter;
-        eosio::asset amount;
-        int64_t rate;
-        int64_t interval;
-        eosio::time_point_sec timestamp;
-        eosio::checksum256 trx_id;
-    };
-
     // Tables
     typedef eosio::multi_index< "voters"_n, voters_row> voters_table;
     typedef eosio::multi_index< "rewards"_n, rewards_row> rewards_table;
     typedef eosio::multi_index< "referrals"_n, referrals_row> referrals_table;
+    typedef eosio::multi_index< "proxies"_n, proxies_row> proxies_table;
     typedef eosio::singleton< "settings"_n, settings_row> settings_table;
-    typedef eosio::singleton< "last"_n, last_row> last_table;
 
     // local instances of the multi indexes
     voters_table                _voters;
     settings_table              _settings;
-    last_table                  _last;
     rewards_table               _rewards;
     referrals_table             _referrals;
+    proxies_table               _proxies;
     eosiosystem::voters_table   _eosio_voters;
 
     // private helpers
     void refresh_voter( const eosio::name owner );
     void refresh_claim_period( const eosio::name owner );
-    void update_last( const eosio::name voter, const eosio::asset amount, const int64_t rate, const int64_t interval );
     void send_rewards( const eosio::name owner, const int64_t staked, const eosio::symbol sym );
     void check_proxy( const eosio::name proxy );
     int64_t calculate_amount( const int64_t staked, const int64_t multiplier, const int64_t rate, const int64_t interval );
     void require_auth_or_self( eosio::name owner );
     void require_auth_or_self_or_referral( eosio::name owner );
     void send_referral( const eosio::name owner, const eosio::asset quantity, const eosio::name contract );
+    void send_reward( const eosio::name owner, const eosio::asset quantity, const eosio::name contract );
 };
