@@ -179,23 +179,46 @@ public:
     /**
      * ## ACTION `setreward`
      *
-     * Set reward asset
+     * Set authorized reward asset
      *
      * - Authority: `get_self()`
      *
      * ### params
      *
-     * - `{extended_symbol} reward` - token reward symbol
+     * - `{symbol} sym` - reward token symbol
+     * - `{name} contract` - reward token contract
      * - `{int64_t} multiplier` - token reward multiplier
+     * - `{asset} price` - EOS price of reward
      *
      * ### example
      *
      * ```bash
-     * cleos push action proxy4nation setreward '[{"contract":"eosio.token", "symbol": "4,EOS"}, 1]' -p proxy4nation
+     * cleos push action proxy4nation setreward '["4,USDT", "tethertether", 1, "0.3344 EOS"]' -p proxy4nation
      * ```
      */
     [[eosio::action]]
-    void setreward( const extended_symbol reward, const int64_t multiplier );
+    void setreward( const eosio::symbol sym, const eosio::name contract, const int64_t multiplier, const eosio::asset price );
+
+    /**
+     * ## ACTION `setprice`
+     *
+     * Set price of rewards and re-calculate APR rate
+     *
+     * - Authority: `get_self()`
+     *
+     * ### params
+     *
+     * - `{symbol_code} code` - reward token symbol code
+     * - `{asset} price` - EOS price of reward
+     *
+     * ### example
+     *
+     * ```bash
+     * cleos push action proxy4nation setprice '["USDT", "0.3344 EOS"]' -p proxy4nation
+     * ```
+     */
+    [[eosio::action]]
+    void setprice( const eosio::symbol_code code, const eosio::asset price );
 
     /**
      * ## ACTION `setreferral`
@@ -242,26 +265,6 @@ public:
     void delreferral( const eosio::name referral );
 
     /**
-     * ## ACTION `setrex`
-     *
-     * Set REX APR rate
-     *
-     * - Authority: `get_self()`
-     *
-     * ### params
-     *
-     * - `{int64_t} [rate=16]` - REX APR rate (pips 1/100 of 1%)
-     *
-     * ### example
-     *
-     * ```bash
-     * cleos push action proxy4nation setrex '[16]' -p proxy4nation
-     * ```
-     */
-    [[eosio::action]]
-    void setrex( const int64_t rate = 16 );
-
-    /**
      * ## ACTION `setproxy`
      *
      * Set authorized proxy
@@ -281,6 +284,26 @@ public:
      */
     [[eosio::action]]
     void setproxy( const eosio::name proxy, const bool active );
+
+    /**
+     * ## ACTION `pause`
+     *
+     * Pause/unpause contract for maintenance
+     *
+     * - Authority: `get_self()`
+     *
+     * ### params
+     *
+     * - `{bool} paused` - true/false if contract is paused for maintenance
+     *
+     * ### example
+     *
+     * ```bash
+     * cleos push action proxy4nation pause '[true]' -p proxy4nation
+     * ```
+     */
+    [[eosio::action]]
+    void pause( const bool paused );
 
     /**
      * ## ON_NOTIFY `transfer`
@@ -322,21 +345,24 @@ public:
     using setinterval_action = eosio::action_wrapper<"setinterval"_n, &proxy::setinterval>;
 
 private:
-
     /**
      * ## TABLE `rewards`
      *
      * - `{symbol} symbol` - reward token symbol
      * - `{name} contract` - reward token contract
      * - `{int64_t} multiplier` - reward multiplier
+     * - `{asset} price` - EOS price of reward
+     * - `{int64_t} apr` - APR rate pips 1/100 of 1%
      *
      * ### example
      *
      * ```json
      * {
-     *   "symbol": "4,EOS",
-     *   "contract": "eosio.token",
-     *   "multiplier": 1
+     *   "symbol": "4,USDT",
+     *   "contract": "tethertether",
+     *   "multiplier": 1,
+     *   "price": "0.3344 EOS",
+     *   "apr": 70
      * }
      * ```
      */
@@ -344,6 +370,8 @@ private:
         eosio::symbol       symbol;
         eosio::name         contract;
         int64_t             multiplier;
+        eosio::asset        price;
+        int64_t             apr;
 
         uint64_t primary_key() const { return symbol.code().raw(); }
     };
@@ -391,8 +419,6 @@ private:
      * ## TABLE `proxies`
      *
      * - `{name} proxy` - voting proxy
-     * - `{vector<name>}` producers - the producers approved by this proxy
-     * - `{double} last_vote_weight` - last vote weight
      * - `{bool} active` - true/false if proxy is active
      *
      * ### example
@@ -400,17 +426,13 @@ private:
      * ```json
      * {
      *   "proxy": "proxy4nation",
-     *   "active": true,
-     *   "producers": ["eosnationftw"],
-     *   "last_vote_weight": "5361455468.19293689727783203"
+     *   "active": true
      * }
      * ```
      */
     struct [[eosio::table("proxies")]] proxies_row {
         eosio::name         proxy;
         bool                active = true;
-        vector<eosio::name> producers;
-        double              last_vote_weight = 0;
 
         uint64_t primary_key() const { return proxy.value; }
     };
@@ -448,7 +470,7 @@ private:
      *
      * - `{int64_t} [rate=400]` - APR rate pips 1/100 of 1%
      * - `{int64_t} [interval=86400]` - claim interval in seconds
-     * - `{int64_t} [rex=16]` - REX APR rate pips 1/100 of 1%
+     * - `{bool} [paused=false]` - true/false if contract is paused for maintenance
      *
      * ### example
      *
@@ -456,14 +478,14 @@ private:
      * {
      *   "rate": 400,
      *   "interval": 86400,
-     *   "rex": 16
+     *   "paused": false
      * }
      * ```
      */
     struct [[eosio::table("settings")]] settings_row {
         int64_t rate = 400;
         int64_t interval = 86400;
-        int64_t rex = 16;
+        bool paused = false;
     };
 
     // Tables
@@ -485,10 +507,26 @@ private:
     void refresh_voter( const eosio::name owner );
     void refresh_claim_period( const eosio::name owner );
     void send_rewards( const eosio::name owner, const int64_t staked, const eosio::symbol sym );
-    void check_proxy( const eosio::name proxy );
     int64_t calculate_amount( const int64_t staked, const int64_t multiplier, const int64_t rate, const int64_t interval );
     void require_auth_or_self( eosio::name owner );
     void require_auth_or_self_or_referral( eosio::name owner );
     void send_referral( const eosio::name owner, const eosio::asset quantity, const eosio::name contract );
     void send_reward( const eosio::name owner, const eosio::asset quantity, const eosio::name contract );
+
+    // proxies
+    eosio::name get_voter_proxy( const eosio::name owner );
+    eosio::name get_active_proxy();
+    bool available_proxy( const eosio::name owner );
+    void check_available_proxy( const eosio::name owner );
+    void check_active_proxy( const eosio::name owner );
+
+    // claim
+    void stake_to( const eosio::name receiver, const int64_t amount );
+    void rex_to( const eosio::name receiver, const int64_t amount );
+
+    // rewards
+    int64_t calculate_apr( const eosio::asset price, const int64_t multiplier );
+
+    // settings
+    void check_pause();
 };
