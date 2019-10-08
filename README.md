@@ -9,10 +9,11 @@
 - [`setrate`](#action-setrate)
 - [`setinterval`](#action-setinterval)
 - [`setreward`](#action-setreward)
+- [`setprice`](#action-setprice)
 - [`setreferral`](#action-setreferral)
 - [`setproxy`](#action-setproxy)
 - [`delreferral`](#action-delreferral)
-- [`setrex`](#action-setrex)
+- [`pause`](#action-pause)
 - [`clean`](#action-clean)
 
 ## TABLE
@@ -21,6 +22,7 @@
 - [`settings`](#table-settings)
 - [`voters`](#table-voters)
 - [`referrals`](#table-referrals)
+- [`proxies`](#table-proxies)
 
 ## APR Formula
 
@@ -59,7 +61,7 @@ cleos push action proxy4nation signup '["myaccount", "tokenyieldio"]' -p myaccou
 
 Claim rewards from EOS Nation Proxy Staking Service
 
-- Authority: `owner`
+- Authority: `owner` or `referral` or `get_self()`
 
 ### params
 
@@ -91,7 +93,7 @@ cleos push action proxy4nation unsignup '["myaccount"]' -p myaccount
 
 Refresh voter information
 
-- Authority: `get_self()`
+- Authority: `any`
 
 ### params
 
@@ -119,22 +121,6 @@ Set APR rate
 cleos push action proxy4nation setrate '[400]' -p proxy4nation
 ```
 
-## ACTION `setrex`
-
-Set REX APR rate
-
-- Authority: `get_self()`
-
-### params
-
-- `{int64_t} [rate=16]` - REX APR rate (pips 1/100 of 1%)
-
-### example
-
-```bash
-cleos push action proxy4nation setrex '[16]' -p proxy4nation
-```
-
 ## ACTION `setinterval`
 
 Set claim interval in seconds
@@ -159,13 +145,32 @@ Set authorized reward asset
 
 ### params
 
-- `{extended_symbol} reward` - token reward symbol
+- `{symbol} sym` - reward token symbol
+- `{name} contract` - reward token contract
 - `{int64_t} multiplier` - token reward multiplier
+- `{asset} price` - EOS price of reward
 
 ### example
 
 ```bash
-cleos push action proxy4nation setreward '[{"contract":"eosio.token", "symbol": "4,EOS"}, 1]' -p proxy4nation
+cleos push action proxy4nation setreward '["4,USDT", "tethertether", 1, "0.3344 EOS","]' -p proxy4nation
+```
+
+## ACTION `setprice`
+
+Set price of rewards and re-calculate APR rate
+
+- Authority: `get_self()`
+
+### params
+
+- `{symbol_code} code` - reward token symbol code
+- `{asset} price` - EOS price of reward
+
+### example
+
+```bash
+cleos push action proxy4nation setprice '["USDT", "0.3344 EOS"]' -p proxy4nation
 ```
 
 ## ACTION `setreferral`
@@ -236,11 +241,29 @@ Cleans contract tables
 cleos push action proxy4nation clean '["referrals"]' -p proxy4nation
 ```
 
+## ACTION `pause`
+
+Pause/unpause contract for maintenance
+
+- Authority: `get_self()`
+
+### params
+
+- `{bool} paused` - true/false if contract is paused for maintenance
+
+### example
+
+```bash
+cleos push action proxy4nation pause '[true]' -p proxy4nation
+```
+
 ## TABLE `rewards`
 
 - `{symbol} symbol` - reward token symbol
 - `{name} contract` - reward token contract
 - `{int64_t} multiplier` - reward multiplier
+- `{asset} price` - EOS price of reward
+- `{int64_t} apr` - APR rate pips 1/100 of 1%
 
 ### example
 
@@ -248,7 +271,9 @@ cleos push action proxy4nation clean '["referrals"]' -p proxy4nation
 {
   "symbol": "4,EOS",
   "contract": "eosio.token",
-  "multiplier": 1
+  "multiplier": 1,
+  "price": "0.3344 EOS",
+  "apr": 70
 }
 ```
 
@@ -300,7 +325,7 @@ cleos push action proxy4nation clean '["referrals"]' -p proxy4nation
 
 - `{int64_t} [rate=350]` - APR rate pips 1/100 of 1%
 - `{int64_t} [interval=86400]` - claim interval in seconds
-- `{int64_t} [rex=16]` - REX APR rate pips 1/100 of 1%
+- `{bool} [paused=false]` - true/false if contract is paused for maintenance
 
 ### example
 
@@ -308,7 +333,7 @@ cleos push action proxy4nation clean '["referrals"]' -p proxy4nation
 {
   "rate": 350,
   "interval": 86400,
-  "rex": 16
+  "paused": false
 }
 ```
 
@@ -316,16 +341,12 @@ cleos push action proxy4nation clean '["referrals"]' -p proxy4nation
 
 - `{name} proxy` - proxy account name
 - `{bool} active` - true/false if proxy is active
-- `{vector<name>}` producers - the producers approved by this proxy
-- `{double} last_vote_weight` - last vote weight
 
 ### example
 
 ```json
 {
   "proxy": "proxy4nation",
-  "active": true,
-  "producers": ["eosnationftw"],
-  "last_vote_weight": "5361455468.19293689727783203"
+  "active": true
 }
 ```
