@@ -13,6 +13,8 @@
 - [`setreferral`](#action-setreferral)
 - [`setproxy`](#action-setproxy)
 - [`delreferral`](#action-delreferral)
+- [`setstaked`](#action-setstaked)
+- [`setprices`](#action-setprices)
 - [`pause`](#action-pause)
 - [`clean`](#action-clean)
 
@@ -173,6 +175,22 @@ Set price of rewards and re-calculate APR rate
 cleos push action proxy4nation setprice '["USDT", "0.3344 EOS"]' -p proxy4nation
 ```
 
+## ACTION `setprices`
+
+Set prices of all rewards and re-calculate APR rate
+
+> Prices feed using NewDex & DelphiOracle
+
+- Authority: `get_self()`
+
+### params
+
+### example
+
+```bash
+cleos push action proxy4nation setprices '[]' -p proxy4nation
+```
+
 ## ACTION `setreferral`
 
 Set authorized referral
@@ -223,6 +241,23 @@ Set authorized proxy
 
 ```bash
 cleos push action proxy4nation setproxy '["proxy4nation", true]' -p proxy4nation
+```
+
+## ACTION `setstaked`
+
+Allow owner to receive EOS rewards as staked instead of liquid.
+
+- Authority: `owner`
+
+### params
+
+- `{name} owner` - owner account name
+- `{bool} staked` - true/false to receiving EOS rewards as staked instead of liquid
+
+### example
+
+```bash
+cleos push action proxy4nation setstaked '["myaccount", true]' -p myaccount
 ```
 
 ## ACTION `clean`
@@ -348,5 +383,19 @@ cleos push action proxy4nation pause '[true]' -p proxy4nation
 {
   "proxy": "proxy4nation",
   "active": true
+}
+```
+
+## TABLE `staked`
+
+- `{name} owner` - owner account name
+- `{bool} staked` - true/false to receiving rewards as staked instead of liquid
+
+### example
+
+```json
+{
+  "proxy": "proxy4nation",
+  "staked": true
 }
 ```
