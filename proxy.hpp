@@ -1,3 +1,5 @@
+#pragma once
+
 #include <eosio/eosio.hpp>
 #include <eosio/time.hpp>
 #include <eosio/system.hpp>
@@ -7,9 +9,16 @@
 #include <string>
 #include <optional>
 
+// eosio system
 #include <eosio.token/eosio.token.hpp>
 #include <eosio.system/eosio.system.hpp>
 #include <eosio.system/get_trx_id.hpp>
+
+// newdex public
+#include <newdexpublic/newdexpublic.hpp>
+
+// delphi oracle
+#include <delphioracle/delphioracle.hpp>
 
 using namespace eosio;
 using namespace std;
@@ -32,6 +41,7 @@ public:
             _rewards( get_self(), get_self().value ),
             _referrals( get_self(), get_self().value ),
             _proxies( get_self(), get_self().value ),
+            _staked( get_self(), get_self().value ),
             _eosio_voters( "eosio"_n, "eosio"_n.value )
     {}
 
@@ -306,6 +316,47 @@ public:
     void pause( const bool paused );
 
     /**
+     * ## ACTION `setstaked`
+     *
+     * Allow owner to receive EOS rewards as staked instead of liquid.
+     *
+     * - Authority: `owner`
+     *
+     * ### params
+     *
+     * - `{name} owner` - owner account name
+     * - `{bool} staked` - true/false to receiving EOS rewards as staked instead of liquid
+     *
+     * ### example
+     *
+     * ```bash
+     * cleos push action proxy4nation setstaked '["myaccount", true]' -p myaccount
+     * ```
+     */
+    [[eosio::action]]
+    void setstaked( const eosio::name owner, const bool staked );
+
+    /**
+     * ## ACTION `setprices`
+     *
+     * Set prices of all rewards and re-calculate APR rate
+     *
+     * > Prices feed using NewDex & DelphiOracle
+     *
+     * - Authority: `get_self()`
+     *
+     * ### params
+     *
+     * ### example
+     *
+     * ```bash
+     * cleos push action proxy4nation setprices '[]' -p proxy4nation
+     * ```
+     */
+    [[eosio::action]]
+    void setprices();
+
+    /**
      * ## ON_NOTIFY `transfer`
      *
      * On token transfer notification, update proxy APR
@@ -343,6 +394,9 @@ public:
     using setreferral_action = eosio::action_wrapper<"setreferral"_n, &proxy::setreferral>;
     using delreferral_action = eosio::action_wrapper<"delreferral"_n, &proxy::delreferral>;
     using setinterval_action = eosio::action_wrapper<"setinterval"_n, &proxy::setinterval>;
+    using setstaked_action = eosio::action_wrapper<"setstaked"_n, &proxy::setstaked>;
+    using setprice_action = eosio::action_wrapper<"setprice"_n, &proxy::setprice>;
+    using setprices_action = eosio::action_wrapper<"setprices"_n, &proxy::setprices>;
 
 private:
     /**
@@ -466,6 +520,28 @@ private:
     };
 
     /**
+     * ## TABLE `staked`
+     *
+     * - `{name} owner` - owner account name
+     * - `{bool} staked` - true/false to receiving rewards as staked instead of liquid
+     *
+     * ### example
+     *
+     * ```json
+     * {
+     *   "proxy": "proxy4nation",
+     *   "staked": true
+     * }
+     * ```
+     */
+    struct [[eosio::table("staked")]] staked_row {
+        eosio::name     owner;
+        bool            staked;
+
+        uint64_t primary_key() const { return owner.value; }
+    };
+
+    /**
      * ## TABLE `settings`
      *
      * - `{int64_t} [rate=400]` - APR rate pips 1/100 of 1%
@@ -493,15 +569,17 @@ private:
     typedef eosio::multi_index< "rewards"_n, rewards_row> rewards_table;
     typedef eosio::multi_index< "referrals"_n, referrals_row> referrals_table;
     typedef eosio::multi_index< "proxies"_n, proxies_row> proxies_table;
+    typedef eosio::multi_index< "staked"_n, staked_row> staked_table;
     typedef eosio::singleton< "settings"_n, settings_row> settings_table;
 
     // local instances of the multi indexes
-    voters_table                _voters;
-    settings_table              _settings;
-    rewards_table               _rewards;
-    referrals_table             _referrals;
-    proxies_table               _proxies;
-    eosiosystem::voters_table   _eosio_voters;
+    voters_table                    _voters;
+    settings_table                  _settings;
+    rewards_table                   _rewards;
+    referrals_table                 _referrals;
+    proxies_table                   _proxies;
+    staked_table                    _staked;
+    eosiosystem::voters_table       _eosio_voters;
 
     // private helpers
     void refresh_voter( const eosio::name owner );
@@ -529,4 +607,12 @@ private:
 
     // settings
     void check_pause();
+
+    // price
+    eosio::asset get_usdt_price();
+    eosio::asset get_dapp_price();
+    void update_price( eosio::symbol_code code, const eosio::asset price );
+
+    // staked
+    bool is_staked( const eosio::name owner );
 };
