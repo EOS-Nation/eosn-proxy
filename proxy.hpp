@@ -5,6 +5,7 @@
 #include <eosio/system.hpp>
 #include <eosio/asset.hpp>
 #include <eosio/singleton.hpp>
+#include <eosio/transaction.hpp>
 
 #include <string>
 #include <optional>
@@ -42,6 +43,7 @@ public:
             _referrals( get_self(), get_self().value ),
             _proxies( get_self(), get_self().value ),
             _staked( get_self(), get_self().value ),
+            _redirect( get_self(), get_self().value ),
             _eosio_voters( "eosio"_n, "eosio"_n.value )
     {}
 
@@ -253,7 +255,6 @@ public:
     [[eosio::action]]
     void setreferral( const eosio::name name, const string website, const string description, const int64_t rate );
 
-
     /**
      * ## ACTION `delreferral`
      *
@@ -357,6 +358,87 @@ public:
     void setprices();
 
     /**
+     * ## ACTION `receipt`
+     *
+     * Push notification to owner with a receipt of incoming rewards
+     *
+     * - Authority: `get_self()`
+     *
+     * ### params
+     *
+     * - `{name} owner` - owner to be notified
+     * - `{asset} staked` - staked amount of owner at the time of claim
+     * - `{vector<asset>} rewards` - rewards earned during claim period
+     *
+     * ### example
+     *
+     * ```bash
+     * cleos push action proxy4nation reset '["myaccount", "100.0000 EOS", ["0.0109 EOS"]]' -p proxy4nation
+     * ```
+     */
+    [[eosio::action]]
+    void receipt( const eosio::name owner, const eosio::asset staked, const std::vector<eosio::asset> rewards );
+
+    /**
+     * ## ACTION `reset`
+     *
+     * Reset owner's next claim period
+     *
+     * - Authority: `get_self()`
+     *
+     * ### params
+     *
+     * - `{name} owner` - owner to reset next claim period
+     *
+     * ### example
+     *
+     * ```bash
+     * cleos push action proxy4nation reset '["myaccount"]' -p proxy4nation
+     * ```
+     */
+    [[eosio::action]]
+    void reset( const eosio::name owner );
+
+    /**
+     * ## ACTION `setredirect`
+     *
+     * Redirect incoming rewards to another account
+     *
+     * - Authority: `owner`
+     *
+     * ### params
+     *
+     * - `{name} owner` - owner account name receiving rewards
+     * - `{bool} to` - redirect rewards `to` account
+     *
+     * ### example
+     *
+     * ```bash
+     * cleos push action proxy4nation setredirect '["toaccount"]' -p myaccount
+     * ```
+     */
+    [[eosio::action]]
+    void setredirect( const eosio::name owner, const eosio::name to );
+
+    /**
+     * ## ACTION `claimall`
+     *
+     * Claim rewards from all voters
+     *
+     * - Authority: `get_self()`
+     *
+     * ### params
+     *
+     * ### example
+     *
+     * ```bash
+     * cleos push action proxy4nation claimall '[]' -p proxy4nation
+     * ```
+     */
+    [[eosio::action]]
+    void claimall();
+
+    /**
      * ## ON_NOTIFY `transfer`
      *
      * On token transfer notification, update proxy APR
@@ -372,6 +454,9 @@ public:
                    const name&    to,
                    const asset&   quantity,
                    const string&  memo );
+
+    [[eosio::on_notify("eosio::onerror")]]
+    void onError();
 
     [[eosio::on_notify("eosio::delegatebw")]]
     void delegatebw( const name& from, const name& receiver,
@@ -397,6 +482,10 @@ public:
     using setstaked_action = eosio::action_wrapper<"setstaked"_n, &proxy::setstaked>;
     using setprice_action = eosio::action_wrapper<"setprice"_n, &proxy::setprice>;
     using setprices_action = eosio::action_wrapper<"setprices"_n, &proxy::setprices>;
+    using receipt_action = eosio::action_wrapper<"receipt"_n, &proxy::receipt>;
+    using reset_action = eosio::action_wrapper<"reset"_n, &proxy::reset>;
+    using claimall_action = eosio::action_wrapper<"claimall"_n, &proxy::claimall>;
+    using setredirect_action = eosio::action_wrapper<"setredirect"_n, &proxy::setredirect>;
 
 private:
     /**
@@ -541,6 +630,29 @@ private:
         uint64_t primary_key() const { return owner.value; }
     };
 
+
+    /**
+     * ## TABLE `redirect`
+     *
+     * - `{name} owner` - owner account name receiving rewards
+     * - `{bool} to` - redirect rewards `to` account
+     *
+     * ### example
+     *
+     * ```json
+     * {
+     *   "owner": "myaccount",
+     *   "to": "toaccount"
+     * }
+     * ```
+     */
+    struct [[eosio::table("redirect")]] redirect_row {
+        eosio::name     owner;
+        eosio::name     to;
+
+        uint64_t primary_key() const { return owner.value; }
+    };
+
     /**
      * ## TABLE `settings`
      *
@@ -570,6 +682,7 @@ private:
     typedef eosio::multi_index< "referrals"_n, referrals_row> referrals_table;
     typedef eosio::multi_index< "proxies"_n, proxies_row> proxies_table;
     typedef eosio::multi_index< "staked"_n, staked_row> staked_table;
+    typedef eosio::multi_index< "redirect"_n, redirect_row> redirect_table;
     typedef eosio::singleton< "settings"_n, settings_row> settings_table;
 
     // local instances of the multi indexes
@@ -579,16 +692,17 @@ private:
     referrals_table                 _referrals;
     proxies_table                   _proxies;
     staked_table                    _staked;
+    redirect_table                  _redirect;
     eosiosystem::voters_table       _eosio_voters;
 
     // private helpers
     void refresh_voter( const eosio::name owner );
     void refresh_claim_period( const eosio::name owner );
-    void send_rewards( const eosio::name owner, const int64_t staked, const eosio::symbol sym );
     int64_t calculate_amount( const int64_t staked, const int64_t multiplier, const int64_t rate, const int64_t interval );
     void require_auth_or_self( eosio::name owner );
     void require_auth_or_self_or_referral( eosio::name owner );
     void send_referral( const eosio::name owner, const eosio::asset quantity, const eosio::name contract );
+    eosio::asset send_rewards( const eosio::name owner, const int64_t staked, const eosio::symbol sym );
     void send_reward( const eosio::name owner, const eosio::asset quantity, const eosio::name contract );
 
     // proxies
@@ -597,6 +711,11 @@ private:
     bool available_proxy( const eosio::name owner );
     void check_available_proxy( const eosio::name owner );
     void check_active_proxy( const eosio::name owner );
+
+    // deferred
+    void auto_refresh( const eosio::name owner );
+    void auto_claim( const eosio::name owner );
+    void auto_setprices();
 
     // claim
     void stake_to( const eosio::name receiver, const int64_t amount );
@@ -615,4 +734,7 @@ private:
 
     // staked
     bool is_staked( const eosio::name owner );
+
+    // redirect
+    eosio::name is_redirect( const eosio::name owner );
 };
