@@ -2,21 +2,36 @@
 
 ## ACTION
 
+### USER ACTIONS
+
 - [`claim`](#action-claim)
 - [`signup`](#action-signup)
 - [`unsignup`](#action-unsignup)
-- [`refresh`](#action-refresh)
+- [`setstaked`](#action-setstaked)
+- [`setredirect`](#action-setstaked)
+
+### REFERRAL ACTION
+
+- [`claim`](#action-claim)
+- [`setreferral`](#action-setreferral)
+- [`delreferral`](#action-delreferral)
+
+### ADMIN ACTIONS
+
 - [`setrate`](#action-setrate)
 - [`setinterval`](#action-setinterval)
 - [`setreward`](#action-setreward)
 - [`setprice`](#action-setprice)
-- [`setreferral`](#action-setreferral)
 - [`setproxy`](#action-setproxy)
+- [`setreferral`](#action-setreferral)
 - [`delreferral`](#action-delreferral)
-- [`setstaked`](#action-setstaked)
 - [`setprices`](#action-setprices)
+- [`receipt`](#action-receipt)
+- [`refresh`](#action-refresh)
+- [`reset`](#action-reset)
 - [`pause`](#action-pause)
 - [`clean`](#action-clean)
+- [`claimall`](#action-claimall)
 
 ## TABLE
 
@@ -260,6 +275,57 @@ Allow owner to receive EOS rewards as staked instead of liquid.
 cleos push action proxy4nation setstaked '["myaccount", true]' -p myaccount
 ```
 
+## ACTION `setredirect`
+
+Redirects incoming rewards to another account
+
+- Authority: `owner`
+
+### params
+
+- `{name} owner` - owner account name receiving rewards
+- `{bool} to` - redirect rewards `to` account
+
+### example
+
+```bash
+cleos push action proxy4nation setredirect '["toaccount"]' -p myaccount
+```
+
+## ACTION `receipt`
+
+Push notification to owner with a receipt of incoming rewards
+
+- Authority: `get_self()`
+
+### params
+
+- `{name} owner` - owner to be notified
+- `{asset} staked` - staked amount of owner at the time of claim
+- `{vector<asset>} rewards` - rewards earned during claim period
+
+### example
+
+```bash
+cleos push action proxy4nation receipt '["myaccount", "100.0000 EOS", ["0.0109 EOS"]]' -p proxy4nation
+```
+
+## ACTION `reset`
+
+Reset owner's next claim period
+
+- Authority: `get_self()`
+
+### params
+
+- `{name} owner` - owner to reset next claim period
+
+### example
+
+```bash
+cleos push action proxy4nation reset '["myaccount"]' -p proxy4nation
+```
+
 ## ACTION `clean`
 
 Cleans contract tables
@@ -290,6 +356,20 @@ Pause/unpause contract for maintenance
 
 ```bash
 cleos push action proxy4nation pause '[true]' -p proxy4nation
+```
+
+## ACTION `claimall`
+
+Claim rewards from all voters
+
+- Authority: `get_self()`
+
+### params
+
+### example
+
+```bash
+cleos push action proxy4nation claimall '[]' -p proxy4nation
 ```
 
 ## TABLE `rewards`
@@ -397,5 +477,19 @@ cleos push action proxy4nation pause '[true]' -p proxy4nation
 {
   "proxy": "proxy4nation",
   "staked": true
+}
+```
+
+## TABLE `redirect`
+
+- `{name} owner` - owner account name receiving rewards
+- `{bool} to` - redirect rewards `to` account
+
+### example
+
+```json
+{
+  "owner": "myaccount",
+  "to": "toaccount"
 }
 ```
