@@ -8,7 +8,8 @@
 - [`signup`](#action-signup)
 - [`unsignup`](#action-unsignup)
 - [`setstaked`](#action-setstaked)
-- [`setredirect`](#action-setstaked)
+- [`setredirect`](#action-setredirect)
+- [`setportfolio`](#action-setportfolio)
 
 ### REFERRAL ACTION
 
@@ -171,6 +172,24 @@ Set authorized reward asset
 
 ```bash
 cleos push action proxy4nation setreward '["4,USDT", "tethertether", 1, "0.3344 EOS","]' -p proxy4nation
+```
+
+## ACTION `setportfolio`
+
+Set owner's portfolio reward allocation
+
+- Authority: `owner`
+
+### params
+
+- `{name} owner` - owner's portfolio
+- `{vector<symbol_code>} rewards` - reward token symbols
+- `{vector<int64_t>} percentages` - reward percentages (pips 1/100 of 1%)
+
+### example
+
+```bash
+cleos push action proxy4nation setportfolio '["myaccount", ["EOS", "USDT"], [5000, 5000]]' -p myaccount
 ```
 
 ## ACTION `setprice`
@@ -491,5 +510,23 @@ cleos push action proxy4nation claimall '[]' -p proxy4nation
 {
   "owner": "myaccount",
   "to": "toaccount"
+}
+```
+
+## TABLE `portfolio`
+
+- Scope: `owner`
+
+- `{symbol} symbol` - reward token symbol
+- `{name} contract` - reward token contract
+- `{int64_t} percentage` - reward percentage (pips 1/100 of 1%)
+
+### example
+
+```json
+{
+  "symbol": "4,EOS",
+  "contract": "eosio.token",
+  "percentage": 10000
 }
 ```
