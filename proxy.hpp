@@ -212,6 +212,28 @@ public:
     void setreward( const eosio::symbol sym, const eosio::name contract, const int64_t multiplier, const eosio::asset price );
 
     /**
+     * ## ACTION `setportfolio`
+     *
+     * Set authorized reward asset
+     *
+     * - Authority: `get_self()`
+     *
+     * ### params
+     *
+     * - `{name} name` - portfolio name (used for scope)
+     * - `{vector<symbol_code>} rewards` - reward token symbols
+     * - `{vector<int64_t>} percentages` - reward percentages (pips 1/100 of 1%)
+     *
+     * ### example
+     *
+     * ```bash
+     * cleos push action proxy4nation setportfolio '["mixed", ["EOS", "USDT"], [5000, 5000]]' -p proxy4nation
+     * ```
+     */
+    [[eosio::action]]
+    void setportfolio( const eosio::name name, const std::vector<eosio::symbol_code> rewards, const std::vector<int64_t> percentages );
+
+    /**
      * ## ACTION `setprice`
      *
      * Set price of rewards and re-calculate APR rate
@@ -436,7 +458,7 @@ public:
      * ```
      */
     [[eosio::action]]
-    void claimall();
+    void claimall( const uint64_t start, const uint64_t end );
 
     /**
      * ## ON_NOTIFY `transfer`
@@ -515,6 +537,33 @@ private:
         int64_t             multiplier;
         eosio::asset        price;
         int64_t             apr;
+
+        uint64_t primary_key() const { return symbol.code().raw(); }
+    };
+
+    /**
+     * ## TABLE `portfolio`
+     *
+     * - Scope: `owner`
+     *
+     * - `{symbol} symbol` - reward token symbol
+     * - `{name} contract` - reward token contract
+     * - `{int64_t} percentage` - reward percentage (pips 1/100 of 1%)
+     *
+     * ### example
+     *
+     * ```json
+     * {
+     *   "symbol": "4,EOS",
+     *   "contract": "eosio.token",
+     *   "percentage": 10000
+     * }
+     * ```
+     */
+    struct [[eosio::table("portfolio")]] portfolio_row {
+        eosio::symbol       symbol;
+        eosio::name         contract;
+        int64_t             percentage;
 
         uint64_t primary_key() const { return symbol.code().raw(); }
     };
@@ -683,6 +732,7 @@ private:
     typedef eosio::multi_index< "proxies"_n, proxies_row> proxies_table;
     typedef eosio::multi_index< "staked"_n, staked_row> staked_table;
     typedef eosio::multi_index< "redirect"_n, redirect_row> redirect_table;
+    typedef eosio::multi_index< "portfolio"_n, portfolio_row> portfolio_table;
     typedef eosio::singleton< "settings"_n, settings_row> settings_table;
 
     // local instances of the multi indexes
@@ -698,12 +748,10 @@ private:
     // private helpers
     void refresh_voter( const eosio::name owner );
     void refresh_claim_period( const eosio::name owner );
-    int64_t calculate_amount( const int64_t staked, const int64_t multiplier, const int64_t rate, const int64_t interval );
+    int64_t calculate_amount( const eosio::symbol_code code, const int64_t staked, const int64_t multiplier, const int64_t rate, const int64_t interval );
     void require_auth_or_self( eosio::name owner );
     void require_auth_or_self_or_referral( eosio::name owner );
     void send_referral( const eosio::name owner, const eosio::asset quantity, const eosio::name contract );
-    eosio::asset send_rewards( const eosio::name owner, const int64_t staked, const eosio::symbol sym );
-    void send_reward( const eosio::name owner, const eosio::asset quantity, const eosio::name contract );
 
     // proxies
     eosio::name get_voter_proxy( const eosio::name owner );
@@ -720,9 +768,11 @@ private:
     // claim
     void stake_to( const eosio::name receiver, const int64_t amount );
     void rex_to( const eosio::name receiver, const int64_t amount );
+    std::vector<eosio::asset> send_rewards( const eosio::name owner, const int64_t staked );
+    void send_reward( const eosio::name owner, const eosio::asset quantity, const eosio::name contract );
 
     // rewards
-    int64_t calculate_apr( const eosio::asset price, const int64_t multiplier );
+    int64_t calculate_apr( const eosio::symbol_code code );
 
     // settings
     void check_pause();
@@ -737,4 +787,9 @@ private:
 
     // redirect
     eosio::name is_redirect( const eosio::name owner );
+
+    // portfolio
+    void clear_portfolio( const eosio::name owner );
+    void set_portfolio_reward( const eosio::name owner, const eosio::symbol_code reward, const int64_t percentage );
+    eosio::name has_portfolio( const eosio::name owner );
 };
