@@ -354,11 +354,12 @@ Cleans contract tables
 ### params
 
 - `{name} table` - table to clean
+- `{name} [scope=""]` - (optional) scope to clean
 
 ### example
 
 ```bash
-cleos push action proxy4nation clean '["referrals"]' -p proxy4nation
+cleos push action proxy4nation clean '["referrals", ""]' -p proxy4nation
 ```
 
 ## ACTION `pause`
@@ -395,19 +396,27 @@ cleos push action proxy4nation claimall '[]' -p proxy4nation
 
 - `{symbol} symbol` - reward token symbol
 - `{name} contract` - reward token contract
-- `{int64_t} multiplier` - reward multiplier
 - `{asset} price` - EOS price of reward
-- `{int64_t} apr` - APR rate pips 1/100 of 1%
 
 ### example
 
 ```json
 {
-  "symbol": "4,EOS",
-  "contract": "eosio.token",
-  "multiplier": 1,
-  "price": "0.3344 EOS",
-  "apr": 70
+  "rows": [{
+      "symbol": "4,EOS",
+      "contract": "eosio.token",
+      "price": "1.0000 EOS"
+    },{
+      "symbol": "4,DAPP",
+      "contract": "dappservices",
+      "price": "0.0050 EOS"
+    },{
+      "symbol": "4,USDT",
+      "contract": "tethertether",
+      "price": "0.3436 EOS"
+    }
+  ],
+  "more": false
 }
 ```
 
@@ -525,8 +534,20 @@ cleos push action proxy4nation claimall '[]' -p proxy4nation
 
 ```json
 {
-  "symbol": "4,EOS",
-  "contract": "eosio.token",
-  "percentage": 10000
+  "rows": [{
+      "symbol": "4,EOS",
+      "contract": "eosio.token",
+      "percentage": 9000
+    },{
+      "symbol": "4,DAPP",
+      "contract": "dappservices",
+      "percentage": 250
+    },{
+      "symbol": "4,USDT",
+      "contract": "tethertether",
+      "percentage": 750
+    }
+  ],
+  "more": false
 }
 ```
