@@ -45,17 +45,17 @@
 ## APR Formula
 
 ```c++
-// amount = Staked * APR / 4 precision / 365 days * multiplier / (24 hours / interval)
-int64_t amount = staked * rate / 10000 / 365 * multiplier / ( 86400 / interval );
+// amount = Staked * APR Rate / 365 days * percentage / (24 hours / interval) * price
+int64_t amount = staked * rate / 10000.0 / 365.0 * percentage / 10000.0 / ( 86400.0 / interval ) * (10000.0 / price.amount);
 ```
 
 **Example**
 
-User has 10K EOS staked and claims his 24 hour reward will earn `1.0547 EOS`
+User has 10K EOS staked and claims his 24 hour reward (at 2.8% APR) will earn `0.7671 EOS`
 
 ```js
 Staked * APR / 365 days = reward
-10000.0000 * 0.0385 / 365 = 1.0547
+10000.0000 * 0.028 / 365 = 0.7671
 ```
 
 ## ACTION `signup`
