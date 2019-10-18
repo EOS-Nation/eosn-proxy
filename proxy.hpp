@@ -138,15 +138,16 @@ public:
      * ### params
      *
      * - `{name} table` - table to clean
+     * - `{name} [scope=""]` - (optional) scope to clean
      *
      * ### example
      *
      * ```bash
-     * cleos push action proxy4nation clean '["voters"]' -p proxy4nation
+     * cleos push action proxy4nation clean '["voters", ""]' -p proxy4nation
      * ```
      */
     [[eosio::action]]
-    void clean( const eosio::name table );
+    void clean( const eosio::name table, const std::optional<eosio::name> scope );
 
     /**
      * ## ACTION `setrate`
@@ -199,17 +200,16 @@ public:
      *
      * - `{symbol} sym` - reward token symbol
      * - `{name} contract` - reward token contract
-     * - `{int64_t} multiplier` - token reward multiplier
      * - `{asset} price` - EOS price of reward
      *
      * ### example
      *
      * ```bash
-     * cleos push action proxy4nation setreward '["4,USDT", "tethertether", 1, "0.3344 EOS"]' -p proxy4nation
+     * cleos push action proxy4nation setreward '["4,USDT", "tethertether", "0.3344 EOS"]' -p proxy4nation
      * ```
      */
     [[eosio::action]]
-    void setreward( const eosio::symbol sym, const eosio::name contract, const int64_t multiplier, const eosio::asset price );
+    void setreward( const eosio::symbol sym, const eosio::name contract, const eosio::asset price );
 
     /**
      * ## ACTION `setportfolio`
@@ -515,28 +515,34 @@ private:
      *
      * - `{symbol} symbol` - reward token symbol
      * - `{name} contract` - reward token contract
-     * - `{int64_t} multiplier` - reward multiplier
      * - `{asset} price` - EOS price of reward
-     * - `{int64_t} apr` - APR rate pips 1/100 of 1%
      *
      * ### example
      *
      * ```json
      * {
-     *   "symbol": "4,USDT",
-     *   "contract": "tethertether",
-     *   "multiplier": 1,
-     *   "price": "0.3344 EOS",
-     *   "apr": 70
+     *   "rows": [{
+     *       "symbol": "4,EOS",
+     *       "contract": "eosio.token",
+     *       "price": "1.0000 EOS"
+     *     },{
+     *       "symbol": "4,DAPP",
+     *       "contract": "dappservices",
+     *       "price": "0.0050 EOS"
+     *     },{
+     *       "symbol": "4,USDT",
+     *       "contract": "tethertether",
+     *       "price": "0.3436 EOS"
+     *     }
+     *   ],
+     *   "more": false
      * }
      * ```
      */
     struct [[eosio::table("rewards")]] rewards_row {
         eosio::symbol       symbol;
         eosio::name         contract;
-        int64_t             multiplier;
         eosio::asset        price;
-        int64_t             apr;
 
         uint64_t primary_key() const { return symbol.code().raw(); }
     };
@@ -554,9 +560,21 @@ private:
      *
      * ```json
      * {
-     *   "symbol": "4,EOS",
-     *   "contract": "eosio.token",
-     *   "percentage": 10000
+     *   "rows": [{
+     *       "symbol": "4,EOS",
+     *       "contract": "eosio.token",
+     *       "percentage": 9000
+     *     },{
+     *       "symbol": "4,DAPP",
+     *       "contract": "dappservices",
+     *       "percentage": 250
+     *     },{
+     *       "symbol": "4,USDT",
+     *       "contract": "tethertether",
+     *       "percentage": 750
+     *     }
+     *   ],
+     *   "more": false
      * }
      * ```
      */
@@ -771,9 +789,6 @@ private:
     std::vector<eosio::asset> send_rewards( const eosio::name owner, const int64_t staked );
     void send_reward( const eosio::name owner, const eosio::asset quantity, const eosio::name contract );
 
-    // rewards
-    int64_t calculate_apr( const eosio::symbol_code code );
-
     // settings
     void check_pause();
 
@@ -792,4 +807,6 @@ private:
     void clear_portfolio( const eosio::name owner );
     void set_portfolio_reward( const eosio::name owner, const eosio::symbol_code reward, const int64_t percentage );
     eosio::name has_portfolio( const eosio::name owner );
+    void update_reward_percentage( const eosio::symbol_code code, const int64_t percentage );
+    double get_current_price( const uint64_t pair_id );
 };
