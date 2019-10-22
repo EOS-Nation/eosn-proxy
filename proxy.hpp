@@ -212,6 +212,26 @@ public:
     void setreward( const eosio::symbol sym, const eosio::name contract, const eosio::asset price );
 
     /**
+     * ## ACTION `delreward`
+     *
+     * Delete authorized reward asset
+     *
+     * - Authority: `get_self()`
+     *
+     * ### params
+     *
+     * - `{symbol_code} sym_code` - reward token symbol code
+     *
+     * ### example
+     *
+     * ```bash
+     * cleos push action proxy4nation delreward '["USDT"]' -p proxy4nation
+     * ```
+     */
+    [[eosio::action]]
+    void delreward( const eosio::symbol_code sym_code );
+
+    /**
      * ## ACTION `setportfolio`
      *
      * Set authorized reward asset
@@ -266,12 +286,12 @@ public:
      * - `{name} name` - referral account name
      * - `{string} website` - referral website
      * - `{string} description` - referral description
-     * - `{int64_t} [rate=50000]` - referral rate pips 1/100 of 1% (maximum of 5%)
+     * - `{int64_t} [rate=500]` - referral rate pips 1/100 of 1% (maximum of 5%)
      *
      * ### example
      *
      * ```bash
-     * cleos push action proxy4nation setreferral '["tokenyieldio", "Track and Manage Blockchain Rewards", "https://tokenyield.io", 50000]' -p proxy4nation
+     * cleos push action proxy4nation setreferral '["tokenyieldio", "Track and Manage Blockchain Rewards", "https://tokenyield.io", 500]' -p proxy4nation
      * ```
      */
     [[eosio::action]]
@@ -662,7 +682,7 @@ private:
      *   "name": "tokenyieldio",
      *   "website": "https://tokenyield.io",
      *   "description": "Track and Manage Blockchain Rewards",
-     *   "rate": 50000
+     *   "rate": 500
      * }
      * ```
      */
@@ -766,7 +786,7 @@ private:
     // private helpers
     void refresh_voter( const eosio::name owner );
     void refresh_claim_period( const eosio::name owner );
-    int64_t calculate_amount( const eosio::symbol_code code, const int64_t staked, const int64_t multiplier, const int64_t rate, const int64_t interval );
+    int64_t calculate_amount( const eosio::symbol_code sym_code, const int64_t staked, const int64_t multiplier, const int64_t rate, const int64_t interval );
     void require_auth_or_self( eosio::name owner );
     void require_auth_or_self_or_referral( eosio::name owner );
     void send_referral( const eosio::name owner, const eosio::asset quantity, const eosio::name contract );
