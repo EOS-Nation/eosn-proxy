@@ -22,6 +22,7 @@
 - [`setrate`](#action-setrate)
 - [`setinterval`](#action-setinterval)
 - [`setreward`](#action-setreward)
+- [`delreward`](#action-delreward)
 - [`setprice`](#action-setprice)
 - [`setproxy`](#action-setproxy)
 - [`setreferral`](#action-setreferral)
@@ -165,13 +166,28 @@ Set authorized reward asset
 
 - `{symbol} sym` - reward token symbol
 - `{name} contract` - reward token contract
-- `{int64_t} multiplier` - token reward multiplier
 - `{asset} price` - EOS price of reward
 
 ### example
 
 ```bash
-cleos push action proxy4nation setreward '["4,USDT", "tethertether", 1, "0.3344 EOS","]' -p proxy4nation
+cleos push action proxy4nation setreward '["4,USDT", "tethertether", "0.3344 EOS"]' -p proxy4nation
+```
+
+## ACTION `delreward`
+
+Delete authorized reward asset
+
+- Authority: `get_self()`
+
+### params
+
+- `{symbol_code} sym_code` - reward token symbol code
+
+### example
+
+```bash
+cleos push action proxy4nation delreward '["USDT"]' -p proxy4nation
 ```
 
 ## ACTION `setportfolio`
@@ -236,12 +252,12 @@ Set authorized referral
 - `{name} name` - referral account name
 - `{string} website` - referral website
 - `{string} description` - referral description
-- `{int64_t} [rate=50000]` - referral rate pips 1/100 of 1% (maximum of 5%)
+- `{int64_t} [rate=500]` - referral rate pips 1/100 of 1% (maximum of 5%)
 
 ### example
 
 ```bash
-cleos push action proxy4nation setreferral '["tokenyieldio", "https://tokenyield.io", "Track and Manage Blockchain Rewards", 50000]' -p proxy4nation
+cleos push action proxy4nation setreferral '["tokenyieldio", "https://tokenyield.io", "Track and Manage Blockchain Rewards", 500]' -p proxy4nation
 ```
 
 ## ACTION `delreferral`
@@ -451,7 +467,7 @@ cleos push action proxy4nation claimall '[]' -p proxy4nation
 - `{name} name` - referral account
 - `{string} website` - referral website
 - `{string} description` - referral description
-- `{int64_t} [rate=50000]` - referral rate pips 1/100 of 1% (maximum of 5%)
+- `{int64_t} [rate=500]` - referral rate pips 1/100 of 1% (maximum of 5%)
 
 ### example
 
@@ -460,7 +476,7 @@ cleos push action proxy4nation claimall '[]' -p proxy4nation
   "name": "tokenyieldio",
   "website": "https://tokenyield.io",
   "description": "Track and Manage Blockchain Rewards",
-  "rate": 50000
+  "rate": 500
 }
 ```
 
