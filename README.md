@@ -1,4 +1,4 @@
-# EOS Nation - Proxy Staking Service
+# EOS Nation - StrengthEARN the network `proxy4nation`
 
 ## ACTION
 
