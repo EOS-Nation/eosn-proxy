@@ -52,11 +52,11 @@ int64_t amount = staked * rate / 10000.0 / 365.0 * percentage / 10000.0 / ( 8640
 
 **Example**
 
-User has 10K EOS staked and claims his 24 hour reward (at 2.8% APR) will earn `0.7671 EOS`
+User has 10K EOS staked and claims his 24 hour reward (at 1.85% APR) will earn `0.5068 EOS`
 
 ```js
 Staked * APR / 365 days = reward
-10000.0000 * 0.028 / 365 = 0.7671
+10000.0000 * 0.0185 / 365 = 0.5068
 ```
 
 ## ACTION `signup`
@@ -132,12 +132,12 @@ Set APR rate
 
 ### params
 
-- `{int64_t} [rate=400]` - APR rate (pips 1/100 of 1%)
+- `{int64_t} [rate=185]` - APR rate (pips 1/100 of 1%)
 
 ### example
 
 ```bash
-cleos push action proxy4nation setrate '[400]' -p proxy4nation
+cleos push action proxy4nation setrate '[185]' -p proxy4nation
 ```
 
 ## ACTION `setinterval`
@@ -482,7 +482,7 @@ cleos push action proxy4nation claimall '[]' -p proxy4nation
 
 ## TABLE `settings`
 
-- `{int64_t} [rate=350]` - APR rate pips 1/100 of 1%
+- `{int64_t} [rate=185]` - APR rate pips 1/100 of 1%
 - `{int64_t} [interval=86400]` - claim interval in seconds
 - `{bool} [paused=false]` - true/false if contract is paused for maintenance
 
@@ -490,7 +490,7 @@ cleos push action proxy4nation claimall '[]' -p proxy4nation
 
 ```json
 {
-  "rate": 350,
+  "rate": 185,
   "interval": 86400,
   "paused": false
 }
