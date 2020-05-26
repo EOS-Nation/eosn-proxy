@@ -12,6 +12,7 @@
 
 // eosio system
 #include <eosio.token/eosio.token.hpp>
+#include <eosio.system/exchange_state.hpp>
 #include <eosio.system/eosio.system.hpp>
 #include <eosio.system/get_trx_id.hpp>
 
@@ -21,12 +22,319 @@
 // delphi oracle
 #include <delphioracle/delphioracle.hpp>
 
+static constexpr int64_t DAY = 86400; // 24 hours
+
 using namespace eosio;
 using namespace std;
 
 class [[eosio::contract("proxy")]] proxy : public contract {
 public:
     using contract::contract;
+
+    /**
+     * ## TABLE `rewards`
+     *
+     * - `{symbol} symbol` - reward token symbol
+     * - `{name} contract` - reward token contract
+     * - `{asset} price` - EOS price of reward
+     *
+     * ### example
+     *
+     * ```json
+     * {
+     *   "rows": [{
+     *       "symbol": "4,EOS",
+     *       "contract": "eosio.token",
+     *       "price": "1.0000 EOS"
+     *     },{
+     *       "symbol": "4,DAPP",
+     *       "contract": "dappservices",
+     *       "price": "0.0050 EOS"
+     *     },{
+     *       "symbol": "4,USDT",
+     *       "contract": "tethertether",
+     *       "price": "0.3436 EOS"
+     *     }
+     *   ],
+     *   "more": false
+     * }
+     * ```
+     */
+    struct [[eosio::table("rewards")]] rewards_row {
+        symbol       symbol;
+        name                contract;
+        asset        price;
+
+        uint64_t primary_key() const { return symbol.code().raw(); }
+    };
+
+    /**
+     * ## TABLE `portfolio`
+     *
+     * - Scope: `owner`
+     *
+     * - `{symbol} symbol` - reward token symbol
+     * - `{name} contract` - reward token contract
+     * - `{int64_t} percentage` - reward percentage (pips 1/100 of 1%)
+     *
+     * ### example
+     *
+     * ```json
+     * {
+     *   "rows": [{
+     *       "symbol": "4,EOS",
+     *       "contract": "eosio.token",
+     *       "percentage": 9000
+     *     },{
+     *       "symbol": "4,DAPP",
+     *       "contract": "dappservices",
+     *       "percentage": 250
+     *     },{
+     *       "symbol": "4,USDT",
+     *       "contract": "tethertether",
+     *       "percentage": 750
+     *     }
+     *   ],
+     *   "more": false
+     * }
+     * ```
+     */
+    struct [[eosio::table("portfolio")]] portfolio_row {
+        symbol       symbol;
+        name                contract;
+        int64_t             percentage;
+
+        uint64_t primary_key() const { return symbol.code().raw(); }
+    };
+
+    /**
+     * ## TABLE `portfolio`
+     *
+     * - `{name} owner` - owner's portfolio
+     * - `{vector<symbol_code>} rewards` - reward token symbols
+     * - `{vector<int64_t>} percentages` - reward percentages (pips 1/100 of 1%)
+     *
+     * ### example
+     *
+     * ```json
+     * {
+     *   "owner": "myaccount",
+     *   "rewards": ["EOS", "USDT"],
+     *   "percentages": [9000, 1000]
+     * }
+     * ```
+     */
+    struct [[eosio::table("portfolio2")]] portfolio2_row {
+        name                    owner;
+        vector<symbol_code>     rewards;
+        vector<int64_t>         percentages;
+
+        uint64_t primary_key() const { return owner.value; }
+    };
+
+    /**
+     * ## TABLE `voters`
+     *
+     * - `{name} owner` - owner staking to proxy
+     * - `{name} proxy` - voting proxy
+     * - `{vector<name>}` producers - the producers approved by this voter if no proxy set
+     * - `{int64_t} staked` - voter info staked
+     * - `{double} last_vote_weight` - last vote weight
+     * - `{boolean} is_proxy` - true/false is proxy
+     * - `{time_point_sec} next_claim_period` - next available claim period
+     * - `{name} referral` - referral account
+     *
+     * ### example
+     *
+     * ```json
+     * {
+     *   "owner": "myaccount",
+     *   "proxy": "proxy4nation",
+     *   "staked": 6000,
+     *   "last_vote_weight": "5361455468.19293689727783203",
+     *   "is_proxy": 0,
+     *   "next_claim_period": "2019-08-07T18:37:37",
+     *   "referral": "tokenyield"
+     * }
+     * ```
+     */
+    struct [[eosio::table("voters")]] voters_row {
+        name                owner;
+        name                proxy;
+        vector<name>        producers;
+        int64_t             staked = 0;
+        double              last_vote_weight = 0;
+        bool                is_proxy = false;
+        time_point_sec      next_claim_period = time_point_sec(0);
+        name                referral = ""_n;
+
+        uint64_t primary_key() const { return owner.value; }
+    };
+
+    /**
+     * ## TABLE `v2.voters`
+     *
+     * - `{name} owner` - owner staking to proxy
+     * - `{time_point_sec} next_claim_period` - next available claim period
+     * - `{int64_t} staked` - voter info staked
+     * - `{name} referral` - referral account
+     * - `{set<symbol_code>} rewards` - (default ["EOS"]) receiving reward token
+     * - `{map<name, bool>} protocol_features` - (true/false) activated protocol features
+     *
+     *
+     * ### example
+     *
+     * ```json
+     * {
+     *   "owner": "myaccount",
+     *   "next_claim_period": "2019-08-07T18:37:37",
+     *   "staked": 20049272,
+     *   "referral": "tokenyield",
+     *   "rewards": ["EOS", "DAPP"],
+     *   "protocol_features": [
+     *      {"key": "staked", "value": true}
+     *   ]
+     * }
+     * ```
+     */
+    struct [[eosio::table("voters.v2")]] voters_v2_row {
+        name                    owner;
+        time_point_sec          next_claim_period = time_point_sec(0);
+        int64_t                 staked = 0;
+        name                    referral = ""_n;
+        set<symbol_code>        rewards = set<symbol_code>{symbol_code{"EOS"}};
+        map<name, bool>         protocol_features;
+
+        uint64_t primary_key() const { return owner.value; }
+        uint64_t by_next_claim() const { return next_claim_period.sec_since_epoch(); }
+        uint64_t by_referral() const { return referral.value; }
+    };
+
+    /**
+     * ## TABLE `proxies`
+     *
+     * - `{name} proxy` - voting proxy
+     * - `{bool} active` - true/false if proxy is active
+     *
+     * ### example
+     *
+     * ```json
+     * {
+     *   "proxy": "proxy4nation",
+     *   "active": true
+     * }
+     * ```
+     */
+    struct [[eosio::table("proxies")]] proxies_row {
+        name            proxy;
+        bool            active = true;
+
+        uint64_t primary_key() const { return proxy.value; }
+    };
+
+    /**
+     * ## TABLE `referrals`
+     *
+     * - `{name} name` - referral account
+     * - `{string} website` - referral website
+     * - `{string} description` - referral description
+     * - `{int64_t} [rate=50000]` - referral rate pips 1/100 of 1% (maximum of 5%)
+     *
+     * ### example
+     *
+     * ```json
+     * {
+     *   "name": "tokenyieldio",
+     *   "website": "https://tokenyield.io",
+     *   "description": "Track and Manage Blockchain Rewards",
+     *   "rate": 500
+     * }
+     * ```
+     */
+    struct [[eosio::table("referrals")]] referrals_row {
+        name            name;
+        string          website;
+        string          description;
+        int64_t         rate;
+
+        uint64_t primary_key() const { return name.value; }
+    };
+
+    /**
+     * ## TABLE `referrals.v2`
+     *
+     * - `{name} name` - referral account
+     * - `{string} website` - referral website
+     * - `{string} description` - referral description
+     * - `{int64_t} [rate=50000]` - referral rate pips 1/100 of 1% (maximum of 5%)
+     *
+     * ### example
+     *
+     * ```json
+     * {
+     *   "referral": "tokenyieldio",
+     *   "metadata_json": [
+     *     {"key": "website", "value": "https://tokenyield.io"},
+     *     {"key": "description", "value": "Track and Manage Blockchain Rewards"}
+     *   ]
+     * }
+     * ```
+     */
+    struct [[eosio::table("referrals.v2")]] referrals_v2_row {
+        name                    referral;
+        map<name, string>       metadata_json;
+
+        uint64_t primary_key() const { return referral.value; }
+    };
+
+
+    /**
+     * ## TABLE `staked`
+     *
+     * - `{name} owner` - owner account name
+     * - `{bool} staked` - true/false to receiving rewards as staked instead of liquid
+     *
+     * ### example
+     *
+     * ```json
+     * {
+     *   "proxy": "proxy4nation",
+     *   "staked": true
+     * }
+     * ```
+     */
+    struct [[eosio::table("staked")]] staked_row {
+        name        owner;
+        bool        staked;
+
+        uint64_t primary_key() const { return owner.value; }
+    };
+
+    /**
+     * ## TABLE `settings`
+     *
+     * - `{int64_t} [rate=185]` - APR rate pips 1/100 of 1%
+     * - `{int64_t} [referral_rate=500]` - referral rate pips 1/100 of 1% (maximum of 5%)
+     * - `{int64_t} [interval=86400]` - claim interval in seconds
+     * - `{bool} [paused=false]` - true/false if contract is paused for maintenance
+     *
+     * ### example
+     *
+     * ```json
+     * {
+     *   "rate": 185,
+     *   "referral_rate": 500,
+     *   "interval": 86400,
+     *   "paused": false
+     * }
+     * ```
+     */
+    struct [[eosio::table("settings")]] settings_row {
+        int64_t rate = 185;
+        int64_t referral_rate = 500;
+        int64_t interval = 86400;
+        bool paused = false;
+    };
 
     /**
      * Construct a new contract given the contract name
@@ -43,8 +351,9 @@ public:
             _referrals( get_self(), get_self().value ),
             _proxies( get_self(), get_self().value ),
             _staked( get_self(), get_self().value ),
-            _redirect( get_self(), get_self().value ),
-            _eosio_voters( "eosio"_n, "eosio"_n.value )
+            _portfolio2( get_self(), get_self().value ),
+            _eosio_voters( "eosio"_n, "eosio"_n.value ),
+            _rexpool( "eosio"_n, "eosio"_n.value )
     {}
 
     /**
@@ -66,7 +375,7 @@ public:
      * ```
      */
     [[eosio::action]]
-    void signup( const eosio::name owner, std::optional<eosio::name> referral = ""_n );
+    void signup( const name owner, std::optional<name> referral = ""_n );
 
     /**
      * ## ACTION `claim`
@@ -86,7 +395,7 @@ public:
      * ```
      */
     [[eosio::action]]
-    void claim( const eosio::name owner );
+    void claim( const name owner );
 
     /**
      * ## ACTION `unsignup`
@@ -106,7 +415,7 @@ public:
      * ```
      */
     [[eosio::action]]
-    void unsignup( const eosio::name owner );
+    void unsignup( const name owner );
 
     /**
      * ## ACTION `refresh`
@@ -126,7 +435,7 @@ public:
      * ```
      */
     [[eosio::action]]
-    void refresh( const eosio::name voter );
+    void refresh( const name voter );
 
     /**
      * ## ACTION `clean`
@@ -147,7 +456,7 @@ public:
      * ```
      */
     [[eosio::action]]
-    void clean( const eosio::name table, const std::optional<eosio::name> scope );
+    void clean( const name table, const std::optional<name> scope );
 
     /**
      * ## ACTION `setrate`
@@ -170,26 +479,6 @@ public:
     void setrate( const int64_t rate = 400 );
 
     /**
-     * ## ACTION `setinterval`
-     *
-     * Set claim interval in seconds
-     *
-     * - Authority: `get_self()`
-     *
-     * ### params
-     *
-     * - `{uint64_t} [interval=86400]` - claim interval in seconds
-     *
-     * ### example
-     *
-     * ```bash
-     * cleos push action proxy4nation setinterval '[86400]' -p proxy4nation
-     * ```
-     */
-    [[eosio::action]]
-    void setinterval( const int64_t interval = 86400 );
-
-    /**
      * ## ACTION `setreward`
      *
      * Set authorized reward asset
@@ -209,7 +498,7 @@ public:
      * ```
      */
     [[eosio::action]]
-    void setreward( const eosio::symbol sym, const eosio::name contract, const eosio::asset price );
+    void setreward( const symbol sym, const name contract, const asset price );
 
     /**
      * ## ACTION `delreward`
@@ -229,29 +518,49 @@ public:
      * ```
      */
     [[eosio::action]]
-    void delreward( const eosio::symbol_code sym_code );
+    void delreward( const symbol_code sym_code );
 
     /**
      * ## ACTION `setportfolio`
      *
-     * Set authorized reward asset
+     * Set owner's portfolio reward allocation
      *
-     * - Authority: `get_self()`
+     * - Authority: `owner` or `get_self()`
      *
      * ### params
      *
-     * - `{name} name` - portfolio name (used for scope)
+     * - `{name} owner` - owner's portfolio
      * - `{vector<symbol_code>} rewards` - reward token symbols
      * - `{vector<int64_t>} percentages` - reward percentages (pips 1/100 of 1%)
      *
      * ### example
      *
      * ```bash
-     * cleos push action proxy4nation setportfolio '["mixed", ["EOS", "USDT"], [5000, 5000]]' -p proxy4nation
+     * cleos push action proxy4nation setportfolio '["myaccount", ["EOS", "USDT"], [9000, 1000]]' -p myaccount
      * ```
      */
     [[eosio::action]]
-    void setportfolio( const eosio::name name, const std::vector<eosio::symbol_code> rewards, const std::vector<int64_t> percentages );
+    void setportfolio( const name owner, const std::vector<symbol_code> rewards, const std::vector<int64_t> percentages );
+
+    /**
+     * ## ACTION `delportfolio`
+     *
+     * Delete owner's portfolio
+     *
+     * - Authority: `owner` or `get_self()`
+     *
+     * ### params
+     *
+     * - `{name} owner` - owner of portfolio
+     *
+     * ### example
+     *
+     * ```bash
+     * cleos push action proxy4nation delportfolio '["myaccount"]' -p myaccount
+     * ```
+     */
+    [[eosio::action]]
+    void delportfolio( const name owner );
 
     /**
      * ## ACTION `setprice`
@@ -272,7 +581,7 @@ public:
      * ```
      */
     [[eosio::action]]
-    void setprice( const eosio::symbol_code code, const eosio::asset price );
+    void setprice( const symbol_code code, const asset price );
 
     /**
      * ## ACTION `setreferral`
@@ -295,7 +604,7 @@ public:
      * ```
      */
     [[eosio::action]]
-    void setreferral( const eosio::name name, const string website, const string description, const int64_t rate );
+    void setreferral( const name name, const string website, const string description, const int64_t rate );
 
     /**
      * ## ACTION `delreferral`
@@ -315,7 +624,7 @@ public:
      * ```
      */
     [[eosio::action]]
-    void delreferral( const eosio::name referral );
+    void delreferral( const name referral );
 
     /**
      * ## ACTION `setproxy`
@@ -336,7 +645,7 @@ public:
      * ```
      */
     [[eosio::action]]
-    void setproxy( const eosio::name proxy, const bool active );
+    void setproxy( const name proxy, const bool active );
 
     /**
      * ## ACTION `pause`
@@ -377,7 +686,7 @@ public:
      * ```
      */
     [[eosio::action]]
-    void setstaked( const eosio::name owner, const bool staked );
+    void setstaked( const name owner, const bool staked );
 
     /**
      * ## ACTION `setprices`
@@ -419,100 +728,25 @@ public:
      * ```
      */
     [[eosio::action]]
-    void receipt( const eosio::name owner, const eosio::asset staked, const std::vector<eosio::asset> rewards );
+    void receipt( const name owner, const asset staked, const std::vector<asset> rewards );
 
-    /**
-     * ## ACTION `reset`
-     *
-     * Reset owner's next claim period
-     *
-     * - Authority: `get_self()`
-     *
-     * ### params
-     *
-     * - `{name} owner` - owner to reset next claim period
-     *
-     * ### example
-     *
-     * ```bash
-     * cleos push action proxy4nation reset '["myaccount"]' -p proxy4nation
-     * ```
-     */
     [[eosio::action]]
-    void reset( const eosio::name owner );
+    void payforcpu( optional<permission_level> payer );
 
-    /**
-     * ## ACTION `setredirect`
-     *
-     * Redirect incoming rewards to another account
-     *
-     * - Authority: `owner`
-     *
-     * ### params
-     *
-     * - `{name} owner` - owner account name receiving rewards
-     * - `{bool} to` - redirect rewards `to` account
-     *
-     * ### example
-     *
-     * ```bash
-     * cleos push action proxy4nation setredirect '["toaccount"]' -p myaccount
-     * ```
-     */
     [[eosio::action]]
-    void setredirect( const eosio::name owner, const eosio::name to );
+    void setparams( const optional<settings_row> params );
 
-    /**
-     * ## ACTION `claimall`
-     *
-     * Claim rewards from all voters
-     *
-     * - Authority: `get_self()`
-     *
-     * ### params
-     *
-     * ### example
-     *
-     * ```bash
-     * cleos push action proxy4nation claimall '[]' -p proxy4nation
-     * ```
-     */
     [[eosio::action]]
-    void claimall( const uint64_t start, const uint64_t end );
+    void migrate( const name owner );
 
-    /**
-     * ## ON_NOTIFY `transfer`
-     *
-     * On token transfer notification, update proxy APR
-     *
-     * ### example
-     *
-     * ```bash
-     * cleos transfer eosnationftw proxy4nation "1.0000 EOS" "EOS Nation Proxy Staking Service"
-     * ```
-     */
+    [[eosio::action]]
+    void migrateall( uint64_t skip );
+
     [[eosio::on_notify("*::transfer")]]
     void transfer( const name&    from,
                    const name&    to,
                    const asset&   quantity,
                    const string&  memo );
-
-    [[eosio::on_notify("eosio::onerror")]]
-    void onError();
-
-    [[eosio::on_notify("eosio::delegatebw")]]
-    void delegatebw( const name& from, const name& receiver,
-                    const asset& stake_net_quantity, const asset& stake_cpu_quantity, bool transfer );
-
-    [[eosio::on_notify("eosio::undelegatebw")]]
-    void undelegatebw( const name& from, const name& receiver,
-                    const asset& unstake_net_quantity, const asset& unstake_cpu_quantity );
-
-    [[eosio::on_notify("eosio::buyrex")]]
-    void buyrex( const name& from, const asset& amount );
-
-    [[eosio::on_notify("eosio::sellrex")]]
-    void sellrex( const name& from, const asset& rex );
 
     using claim_action = eosio::action_wrapper<"claim"_n, &proxy::claim>;
     using signup_action = eosio::action_wrapper<"signup"_n, &proxy::signup>;
@@ -520,313 +754,108 @@ public:
     using setrate_action = eosio::action_wrapper<"setrate"_n, &proxy::setrate>;
     using setreferral_action = eosio::action_wrapper<"setreferral"_n, &proxy::setreferral>;
     using delreferral_action = eosio::action_wrapper<"delreferral"_n, &proxy::delreferral>;
-    using setinterval_action = eosio::action_wrapper<"setinterval"_n, &proxy::setinterval>;
     using setstaked_action = eosio::action_wrapper<"setstaked"_n, &proxy::setstaked>;
     using setprice_action = eosio::action_wrapper<"setprice"_n, &proxy::setprice>;
     using setprices_action = eosio::action_wrapper<"setprices"_n, &proxy::setprices>;
     using receipt_action = eosio::action_wrapper<"receipt"_n, &proxy::receipt>;
-    using reset_action = eosio::action_wrapper<"reset"_n, &proxy::reset>;
-    using claimall_action = eosio::action_wrapper<"claimall"_n, &proxy::claimall>;
-    using setredirect_action = eosio::action_wrapper<"setredirect"_n, &proxy::setredirect>;
+    using setportfolio_action = eosio::action_wrapper<"setportfolio"_n, &proxy::setportfolio>;
+    using delportfolio_action = eosio::action_wrapper<"delportfolio"_n, &proxy::delportfolio>;
+    using setreward_action = eosio::action_wrapper<"setreward"_n, &proxy::setreward>;
 
 private:
-    /**
-     * ## TABLE `rewards`
-     *
-     * - `{symbol} symbol` - reward token symbol
-     * - `{name} contract` - reward token contract
-     * - `{asset} price` - EOS price of reward
-     *
-     * ### example
-     *
-     * ```json
-     * {
-     *   "rows": [{
-     *       "symbol": "4,EOS",
-     *       "contract": "eosio.token",
-     *       "price": "1.0000 EOS"
-     *     },{
-     *       "symbol": "4,DAPP",
-     *       "contract": "dappservices",
-     *       "price": "0.0050 EOS"
-     *     },{
-     *       "symbol": "4,USDT",
-     *       "contract": "tethertether",
-     *       "price": "0.3436 EOS"
-     *     }
-     *   ],
-     *   "more": false
-     * }
-     * ```
-     */
-    struct [[eosio::table("rewards")]] rewards_row {
-        eosio::symbol       symbol;
-        eosio::name         contract;
-        eosio::asset        price;
-
-        uint64_t primary_key() const { return symbol.code().raw(); }
-    };
-
-    /**
-     * ## TABLE `portfolio`
-     *
-     * - Scope: `owner`
-     *
-     * - `{symbol} symbol` - reward token symbol
-     * - `{name} contract` - reward token contract
-     * - `{int64_t} percentage` - reward percentage (pips 1/100 of 1%)
-     *
-     * ### example
-     *
-     * ```json
-     * {
-     *   "rows": [{
-     *       "symbol": "4,EOS",
-     *       "contract": "eosio.token",
-     *       "percentage": 9000
-     *     },{
-     *       "symbol": "4,DAPP",
-     *       "contract": "dappservices",
-     *       "percentage": 250
-     *     },{
-     *       "symbol": "4,USDT",
-     *       "contract": "tethertether",
-     *       "percentage": 750
-     *     }
-     *   ],
-     *   "more": false
-     * }
-     * ```
-     */
-    struct [[eosio::table("portfolio")]] portfolio_row {
-        eosio::symbol       symbol;
-        eosio::name         contract;
-        int64_t             percentage;
-
-        uint64_t primary_key() const { return symbol.code().raw(); }
-    };
-
-    /**
-     * ## TABLE `voters`
-     *
-     * - `{name} owner` - owner staking to proxy
-     * - `{name} proxy` - voting proxy
-     * - `{vector<name>}` producers - the producers approved by this voter if no proxy set
-     * - `{int64_t} staked` - voter info staked
-     * - `{double} last_vote_weight` - last vote weight
-     * - `{boolean} is_proxy` - true/false is proxy
-     * - `{time_point_sec} next_claim_period` - next available claim period
-     * - `{name} referral` - referral account
-     *
-     * ### example
-     *
-     * ```json
-     * {
-     *   "owner": "myaccount",
-     *   "proxy": "proxy4nation",
-     *   "staked": 6000,
-     *   "last_vote_weight": "5361455468.19293689727783203",
-     *   "is_proxy": 0,
-     *   "next_claim_period": "2019-08-07T18:37:37",
-     *   "referral": "tokenyield"
-     * }
-     * ```
-     */
-    struct [[eosio::table("voters")]] voters_row {
-        eosio::name         owner;
-        eosio::name         proxy;
-        vector<eosio::name> producers;
-        int64_t             staked = 0;
-        double              last_vote_weight = 0;
-        bool                is_proxy = false;
-        time_point_sec      next_claim_period = time_point_sec(0);
-        eosio::name         referral = ""_n;
-
-        uint64_t primary_key() const { return owner.value; }
-    };
-
-    /**
-     * ## TABLE `proxies`
-     *
-     * - `{name} proxy` - voting proxy
-     * - `{bool} active` - true/false if proxy is active
-     *
-     * ### example
-     *
-     * ```json
-     * {
-     *   "proxy": "proxy4nation",
-     *   "active": true
-     * }
-     * ```
-     */
-    struct [[eosio::table("proxies")]] proxies_row {
-        eosio::name         proxy;
-        bool                active = true;
-
-        uint64_t primary_key() const { return proxy.value; }
-    };
-
-    /**
-     * ## TABLE `referrals`
-     *
-     * - `{name} name` - referral account
-     * - `{string} website` - referral website
-     * - `{string} description` - referral description
-     * - `{int64_t} [rate=50000]` - referral rate pips 1/100 of 1% (maximum of 5%)
-     *
-     * ### example
-     *
-     * ```json
-     * {
-     *   "name": "tokenyieldio",
-     *   "website": "https://tokenyield.io",
-     *   "description": "Track and Manage Blockchain Rewards",
-     *   "rate": 500
-     * }
-     * ```
-     */
-    struct [[eosio::table("referrals")]] referrals_row {
-        eosio::name     name;
-        string          website;
-        string          description;
-        int64_t         rate;
-
-        uint64_t primary_key() const { return name.value; }
-    };
-
-    /**
-     * ## TABLE `staked`
-     *
-     * - `{name} owner` - owner account name
-     * - `{bool} staked` - true/false to receiving rewards as staked instead of liquid
-     *
-     * ### example
-     *
-     * ```json
-     * {
-     *   "proxy": "proxy4nation",
-     *   "staked": true
-     * }
-     * ```
-     */
-    struct [[eosio::table("staked")]] staked_row {
-        eosio::name     owner;
-        bool            staked;
-
-        uint64_t primary_key() const { return owner.value; }
-    };
-
-
-    /**
-     * ## TABLE `redirect`
-     *
-     * - `{name} owner` - owner account name receiving rewards
-     * - `{bool} to` - redirect rewards `to` account
-     *
-     * ### example
-     *
-     * ```json
-     * {
-     *   "owner": "myaccount",
-     *   "to": "toaccount"
-     * }
-     * ```
-     */
-    struct [[eosio::table("redirect")]] redirect_row {
-        eosio::name     owner;
-        eosio::name     to;
-
-        uint64_t primary_key() const { return owner.value; }
-    };
-
-    /**
-     * ## TABLE `settings`
-     *
-     * - `{int64_t} [rate=400]` - APR rate pips 1/100 of 1%
-     * - `{int64_t} [interval=86400]` - claim interval in seconds
-     * - `{bool} [paused=false]` - true/false if contract is paused for maintenance
-     *
-     * ### example
-     *
-     * ```json
-     * {
-     *   "rate": 400,
-     *   "interval": 86400,
-     *   "paused": false
-     * }
-     * ```
-     */
-    struct [[eosio::table("settings")]] settings_row {
-        int64_t rate = 400;
-        int64_t interval = 86400;
-        bool paused = false;
-    };
-
     // Tables
     typedef eosio::multi_index< "voters"_n, voters_row> voters_table;
     typedef eosio::multi_index< "rewards"_n, rewards_row> rewards_table;
     typedef eosio::multi_index< "referrals"_n, referrals_row> referrals_table;
     typedef eosio::multi_index< "proxies"_n, proxies_row> proxies_table;
     typedef eosio::multi_index< "staked"_n, staked_row> staked_table;
-    typedef eosio::multi_index< "redirect"_n, redirect_row> redirect_table;
     typedef eosio::multi_index< "portfolio"_n, portfolio_row> portfolio_table;
+    typedef eosio::multi_index< "portfolio2"_n, portfolio2_row> portfolio2_table;
     typedef eosio::singleton< "settings"_n, settings_row> settings_table;
 
+    // Tables v2
+    typedef eosio::multi_index< "voters.v2"_n, voters_v2_row,
+		indexed_by<"bynextclaim"_n, const_mem_fun<voters_v2_row, uint64_t, &voters_v2_row::by_next_claim>>,
+        indexed_by<"byreferral"_n, const_mem_fun<voters_v2_row, uint64_t, &voters_v2_row::by_referral>>
+	> voters_v2_table;
+
+    typedef eosio::multi_index< "referrals.v2"_n, referrals_v2_row> referrals_v2_table;
+
     // local instances of the multi indexes
-    voters_table                    _voters;
+    voters_v2_table                 _voters;
     settings_table                  _settings;
     rewards_table                   _rewards;
     referrals_table                 _referrals;
     proxies_table                   _proxies;
     staked_table                    _staked;
-    redirect_table                  _redirect;
+    portfolio2_table                _portfolio2;
     eosiosystem::voters_table       _eosio_voters;
+    eosiosystem::rex_pool_table     _rexpool;
 
-    // private helpers
-    void refresh_voter( const eosio::name owner );
-    void refresh_claim_period( const eosio::name owner );
-    int64_t calculate_amount( const eosio::symbol_code sym_code, const int64_t staked, const int64_t multiplier, const int64_t rate, const int64_t interval );
-    void require_auth_or_self( eosio::name owner );
-    void require_auth_or_self_or_referral( eosio::name owner );
-    void send_referral( const eosio::name owner, const eosio::asset quantity, const eosio::name contract );
+    // refresh
+    void update_voter_staked( const name owner );
+    void erase_ineligible( const name owner );
+    void refresh_claim_period( const name owner );
 
-    // proxies
-    eosio::name get_voter_proxy( const eosio::name owner );
-    eosio::name get_active_proxy();
-    bool available_proxy( const eosio::name owner );
-    void check_available_proxy( const eosio::name owner );
-    void check_active_proxy( const eosio::name owner );
-
-    // deferred
-    void auto_refresh( const eosio::name owner );
-    void auto_claim( const eosio::name owner );
-    void auto_setprices();
+    // utils
+    void check_voter_exists( const name owner );
 
     // claim
-    void stake_to( const eosio::name receiver, const int64_t amount );
-    void rex_to( const eosio::name receiver, const int64_t amount );
-    std::vector<eosio::asset> send_rewards( const eosio::name owner, const int64_t staked );
-    void send_reward( const eosio::name owner, const eosio::asset quantity, const eosio::name contract );
+    int64_t calculate_amount( const symbol_code sym_code, const int64_t staked, const int64_t multiplier, const int64_t rate, const int64_t interval );
+    void send_referral( const name owner, const asset quantity, const name contract );
+
+    // proxies
+    name get_voter_proxy( const name owner );
+    name get_active_proxy();
+    bool available_proxy( const name owner );
+    void check_available_proxy( const name owner );
+    void check_active_proxy( const name owner );
+
+    // // deferred
+    // void auto_refresh( const name owner );
+    // void auto_claim( const name owner );
+    // void auto_setprices();
+
+    // claim
+    void stake_to( const name receiver, const int64_t amount );
+    void rex_to( const name receiver, const int64_t amount );
+    std::vector<asset> send_rewards( const name owner, const int64_t staked );
+    void send_reward( const name owner, const asset quantity, const name contract );
 
     // settings
     void check_pause();
 
     // price
-    eosio::asset get_usdt_price();
-    eosio::asset get_dapp_price();
-    void update_price( eosio::symbol_code code, const eosio::asset price );
+    asset get_usdt_price();
+    asset get_dapp_price();
+    void update_price( symbol_code sym_code, const asset price );
+    void update_price( const symbol_code sym_code );
+    void update_reward_price( const symbol_code sym_code );
 
     // staked
-    bool is_staked( const eosio::name owner );
+    bool is_staked( const name owner );
 
-    // redirect
-    eosio::name is_redirect( const eosio::name owner );
+    // rewards
+    void check_reward_exists( const symbol_code sym_code );
 
     // portfolio
-    void clear_portfolio( const eosio::name owner );
-    void set_portfolio_reward( const eosio::name owner, const eosio::symbol_code reward, const int64_t percentage );
-    eosio::name has_portfolio( const eosio::name owner );
-    void update_reward_percentage( const eosio::symbol_code code, const int64_t percentage );
+    void set_portfolio_rewards( const name owner, const std::vector<symbol_code> rewards, const std::vector<int64_t> percentages );
+    name has_portfolio( const name owner );
+    void update_reward_percentage( const symbol_code code, const int64_t percentage );
     double get_current_price( const uint64_t pair_id );
+
+    // delegatebw
+    asset get_delegatebw( const name owner );
+    asset claim_delegatebw( const name owner );
+    int64_t get_rented_tokens( const asset payment );
+
+    // TO ERASE (Backward compatible)
+    void clear_portfolio( const name owner );
+    void set_portfolio_reward( const name owner, const symbol_code reward, const int64_t percentage );
+
+    // signup
+    void check_already_signup( const name owner, std::optional<name> referral );
+
+    // // on_notify
+    // void send_deferred( const eosio::action action, const uint64_t key, const uint64_t interval );
 };
